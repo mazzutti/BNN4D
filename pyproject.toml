@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bnn4d"
+version = "0.1.0"
+description = "Probabilistic neural networks from Sukar et al. (2026) for 4D seismic inversion"
+requires-python = ">=3.10"
+dependencies = ["matplotlib>=3.8", "numpy>=1.24", "torch>=2.0"]
+
+[project.scripts]
+bnn4d = "bnn4d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

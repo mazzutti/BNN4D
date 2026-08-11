@@ -1,0 +1,150 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BNN4D: gerar dados demo",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "make-demo-data",
+        "--output",
+        "${workspaceFolder}/artifacts/demo.npz"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "BNN4D: treinar aleatoric (demo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "train",
+        "--data",
+        "${workspaceFolder}/artifacts/demo.npz",
+        "--output",
+        "${workspaceFolder}/artifacts/aleatoric.pt",
+        "--model",
+        "aleatoric",
+        "--epochs",
+        "30",
+        "--widths",
+        "32",
+        "16",
+        "32",
+        "--log-every",
+        "1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "BNN4D: treinar epistemic (demo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "train",
+        "--data",
+        "${workspaceFolder}/artifacts/demo.npz",
+        "--output",
+        "${workspaceFolder}/artifacts/epistemic.pt",
+        "--model",
+        "epistemic",
+        "--epochs",
+        "3",
+        "--widths",
+        "32",
+        "16",
+        "32",
+        "--log-every",
+        "1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "BNN4D: predizer aleatoric (demo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "predict",
+        "--data",
+        "${workspaceFolder}/artifacts/demo.npz",
+        "--checkpoint",
+        "${workspaceFolder}/artifacts/aleatoric.pt",
+        "--output",
+        "${workspaceFolder}/artifacts/predictions_aleatoric.npz"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "BNN4D: predizer epistemic (demo)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "predict",
+        "--data",
+        "${workspaceFolder}/artifacts/demo.npz",
+        "--checkpoint",
+        "${workspaceFolder}/artifacts/epistemic.pt",
+        "--output",
+        "${workspaceFolder}/artifacts/predictions_epistemic.npz",
+        "--samples",
+        "20"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "BNN4D: visualizar resultados aleatoric",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bnn4d.cli",
+      "args": [
+        "plot",
+        "--predictions",
+        "${workspaceFolder}/artifacts/predictions_aleatoric.npz",
+        "--data",
+        "${workspaceFolder}/artifacts/demo.npz",
+        "--checkpoint",
+        "${workspaceFolder}/artifacts/aleatoric.pt",
+        "--output-dir",
+        "${workspaceFolder}/artifacts/plots_aleatoric"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "MPLCONFIGDIR": "${workspaceFolder}/.matplotlib"
+      },
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "BNN4D: preparar demo",
+      "configurations": [
+        "BNN4D: gerar dados demo"
+      ]
+    }
+  ]
+}
