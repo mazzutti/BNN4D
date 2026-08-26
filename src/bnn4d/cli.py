@@ -769,10 +769,10 @@ def run_all_ablations(args: argparse.Namespace) -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     scenarios = [
-        ("exp1_no_static_no_ts", "1. Sem Static / Sem TS", False, False),
-        ("exp2_with_static_no_ts", "2. Com Static / Sem TS", True, False),
-        ("exp3_no_static_with_ts", "3. Sem Static / Com TS", False, True),
-        ("exp4_with_static_with_ts", "4. Com Static / Com TS", True, True),
+        ("exp1_no_static_no_ts", "1. No Static / No TS", False, False),
+        ("exp2_with_static_no_ts", "2. With Static / No TS", True, False),
+        ("exp3_no_static_with_ts", "3. No Static / With TS", False, True),
+        ("exp4_with_static_with_ts", "4. With Static / With TS", True, True),
     ]
 
     for model_type in models_to_run:

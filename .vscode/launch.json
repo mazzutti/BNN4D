@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "0. [RUN-ALL] Executar Todos os 4 Experimentos + Plots Comparativos (Aleatoric + Epistemic)",
+      "name": "0. [RUN-ALL] Run All 4 Ablations + Comparison Plots (Aleatoric + Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -48,7 +48,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "0. [RUN-ALL] Executar Todos os 4 Experimentos (Apenas Epistemic)",
+      "name": "0. [RUN-ALL] Run All 4 Ablations (Epistemic Only)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -93,7 +93,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "0. [RUN-ALL] Executar Todos os 4 Experimentos (Apenas Aleatoric)",
+      "name": "0. [RUN-ALL] Run All 4 Ablations (Aleatoric Only)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -136,7 +136,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "1. [EXP-1] CV 5-Fold: Sem Static / Sem TS (Aleatoric)",
+      "name": "1. [EXP-1] 5-Fold CV: No Static / No TS (Aleatoric)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -177,9 +177,8 @@
         "MPLCONFIGDIR": "${workspaceFolder}/.matplotlib"
       },
       "console": "integratedTerminal"
-    },
     {
-      "name": "2. [EXP-1] CV 5-Fold: Sem Static / Sem TS (Epistemic)",
+      "name": "2. [EXP-1] 5-Fold CV: No Static / No TS (Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -224,7 +223,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "3. [EXP-2] CV 5-Fold: Com Static / Sem TS (Aleatoric)",
+      "name": "3. [EXP-2] 5-Fold CV: With Static / No TS (Aleatoric)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -268,7 +267,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "4. [EXP-2] CV 5-Fold: Com Static / Sem TS (Epistemic)",
+      "name": "4. [EXP-2] 5-Fold CV: With Static / No TS (Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -314,7 +313,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "5. [EXP-3] CV 5-Fold: Sem Static / Com TS (Aleatoric)",
+      "name": "5. [EXP-3] 5-Fold CV: No Static / With TS (Aleatoric)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -358,7 +357,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "6. [EXP-3] CV 5-Fold: Sem Static / Com TS (Epistemic)",
+      "name": "6. [EXP-3] 5-Fold CV: No Static / With TS (Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -404,7 +403,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "7. [EXP-4] CV 5-Fold: Com Static / Com TS (Aleatoric)",
+      "name": "7. [EXP-4] 5-Fold CV: With Static / With TS (Aleatoric)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -449,7 +448,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "8. [EXP-4] CV 5-Fold: Com Static / Com TS (Epistemic)",
+      "name": "8. [EXP-4] 5-Fold CV: With Static / With TS (Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -496,7 +495,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "9. [PLOT-COMPARE] Gerar Plots Comparativos dos 4 Cenários (Aleatoric)",
+      "name": "9. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Aleatoric)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -505,12 +504,14 @@
         "--data",
         "${workspaceFolder}/artifacts/unisim_4d.npz",
         "--experiments",
-        "1. Sem Static / Sem TS=${workspaceFolder}/artifacts/exp1_no_static_no_ts_aleatoric",
-        "2. Com Static / Sem TS=${workspaceFolder}/artifacts/exp2_with_static_no_ts_aleatoric",
-        "3. Sem Static / Com TS=${workspaceFolder}/artifacts/exp3_no_static_with_ts_aleatoric",
-        "4. Com Static / Com TS=${workspaceFolder}/artifacts/exp4_with_static_with_ts_aleatoric",
+        "1. No Static / No TS=${workspaceFolder}/artifacts/ablation_study/exp1_no_static_no_ts_aleatoric",
+        "2. With Static / No TS=${workspaceFolder}/artifacts/ablation_study/exp2_with_static_no_ts_aleatoric",
+        "3. No Static / With TS=${workspaceFolder}/artifacts/ablation_study/exp3_no_static_with_ts_aleatoric",
+        "4. With Static / With TS=${workspaceFolder}/artifacts/ablation_study/exp4_with_static_with_ts_aleatoric",
         "--output-dir",
-        "${workspaceFolder}/artifacts/comparison_4configs_aleatoric"
+        "${workspaceFolder}/artifacts/ablation_study",
+        "--model-name",
+        "aleatoric"
       ],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -520,7 +521,7 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "10. [PLOT-COMPARE] Gerar Plots Comparativos dos 4 Cenários (Epistemic)",
+      "name": "10. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",
@@ -529,12 +530,14 @@
         "--data",
         "${workspaceFolder}/artifacts/unisim_4d.npz",
         "--experiments",
-        "1. Sem Static / Sem TS=${workspaceFolder}/artifacts/exp1_no_static_no_ts_epistemic",
-        "2. Com Static / Sem TS=${workspaceFolder}/artifacts/exp2_with_static_no_ts_epistemic",
-        "3. Sem Static / Com TS=${workspaceFolder}/artifacts/exp3_no_static_with_ts_epistemic",
-        "4. Com Static / Com TS=${workspaceFolder}/artifacts/exp4_with_static_with_ts_epistemic",
+        "1. No Static / No TS=${workspaceFolder}/artifacts/ablation_study/exp1_no_static_no_ts_epistemic",
+        "2. With Static / No TS=${workspaceFolder}/artifacts/ablation_study/exp2_with_static_no_ts_epistemic",
+        "3. No Static / With TS=${workspaceFolder}/artifacts/ablation_study/exp3_no_static_with_ts_epistemic",
+        "4. With Static / With TS=${workspaceFolder}/artifacts/ablation_study/exp4_with_static_with_ts_epistemic",
         "--output-dir",
-        "${workspaceFolder}/artifacts/comparison_4configs_epistemic"
+        "${workspaceFolder}/artifacts/ablation_study",
+        "--model-name",
+        "epistemic"
       ],
       "cwd": "${workspaceFolder}",
       "env": {

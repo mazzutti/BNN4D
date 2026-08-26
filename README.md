@@ -1,85 +1,85 @@
 # BNN4D: Bayesian Neural Networks for 4D Seismic Inversion
 
-Implementação em Python/PyTorch do framework de quantificação de incertezas em inversão sísmica 4D baseado em **Sukar, Côrte e MacBeth (2026)** (*“Dynamic Reservoir Property Estimation With Uncertainty Quantification From 4D Seismic Data Using Bayesian Neural Networks”*), adaptado para o benchmark de reservatório **UNISIM-I**.
+Python/PyTorch implementation of the 4D seismic reservoir property estimation and uncertainty quantification framework based on **Sukar, Côrte & MacBeth (2026)** (*“Dynamic Reservoir Property Estimation With Uncertainty Quantification From 4D Seismic Data Using Bayesian Neural Networks”*), adapted for the **UNISIM-I** benchmark reservoir.
 
 ---
 
-## 1. Arquitetura e Modelagem
+## 1. Architecture & Modeling
 
-O repositório implementa duas abordagens bayesianas complementares para mapear atributos sísmicos 4D diretamente em variações de propriedades de reservatório com quantificação de incertezas:
+The codebase provides two complementary Bayesian deep learning approaches to invert 4D seismic attributes directly into dynamic reservoir property changes with calibrated uncertainty estimates:
 
-1. **Modelo Aleatórico (`AleatoricAutoencoder`):**
-   - Rede feedforward profunda com cabeças duplas de saída: $\mu(x)$ (média preditiva) e $\log \sigma^2(x)$ (log-variância da incerteza dos dados/ruído de medição).
-   - Otimizado via Negative Log-Likelihood Gaussiana Heteroscedástica:
+1. **Aleatoric Model (`AleatoricAutoencoder` with Residual Skip-Connections):**
+   - Deep feedforward neural network with dual output heads: $\mu(x)$ (predictive mean) and $\log \sigma^2(x)$ (heteroscedastic log-variance of observation noise).
+   - Optimized via Heteroscedastic Gaussian Negative Log-Likelihood:
      $$\mathcal{L}_{\text{aleatoric}} = \frac{1}{2N} \sum_{i=1}^N \left( \frac{\|y_i - \mu(x_i)\|^2}{\sigma^2(x_i)} + \log \sigma^2(x_i) \right)$$
 
-2. **Modelo Epistêmico (`EpistemicBNN`):**
-   - Rede neural bayesiana completa onde **todas as camadas lineares possuem pesos estocásticos** parametrizados por distribuições Gaussianas Variacionais $w \sim \mathcal{N}(\mu_w, \sigma_w^2)$.
-   - Prior Gaussiano padrão $\mathcal{N}(0, \sigma_0^2 I)$.
-   - Otimizado via Variational Free Energy / ELBO com regularização $\text{KL}(q(w) \| p(w))$.
-   - Inferência por **Monte Carlo Dropout / Variational Draws**: $S$ passes estocásticos determinam a média $\mathbb{E}[y]$ e o desvio padrão epistêmico $\sigma_{\text{epistemic}} = \text{std}(y^{(s)})$.
+2. **Epistemic Model (`EpistemicBNN` / Res-BNN):**
+   - Fully variational Bayesian Neural Network where **all dense layers contain stochastic Gaussian weight distributions** $w \sim \mathcal{N}(\mu_w, \sigma_w^2)$.
+   - Standard Gaussian prior $\mathcal{N}(0, \sigma_0^2 I)$.
+   - Optimized via Variational Free Energy / ELBO with $\text{KL}(q(w) \| p(w))$ divergence regularizer and KL annealing warmup.
+   - Inference via **Monte Carlo Variational Sampling**: $S$ stochastic draws estimate posterior expectation $\mathbb{E}[y]$ and epistemic model uncertainty $\sigma_{\text{epistemic}} = \text{std}(y^{(s)})$.
 
 ---
 
-## 2. Entradas e Saídas do Modelo
+## 2. Model Inputs & Outputs
 
-### Saídas Estimadas (Outputs / Targets):
-O modelo infere simultaneamente 3 variações temporais de propriedades dinâmicas e petroelásticas entre levantamentos sísmicos, juntamente com o mapa espacial de incerteza $\sigma$:
-* **$\Delta V_P$:** Variação de velocidade de onda compressional P ($m/s$).
-* **$\Delta S_w$:** Variação de saturação de água no espaço poroso ($0.0 - 1.0$).
-* **$\Delta \rho$:** Variação de densidade de rocha e fluidos combinados ($g/cm^3$).
-* **$\sigma$:** Incerteza preditiva associada a cada propriedade estimada.
+### Target Outputs:
+The models simultaneously predict 3 dynamic petroelastic property changes between base and monitor surveys, alongside spatial uncertainty maps $\sigma$:
+* **$\Delta V_P$:** P-wave compressional velocity change ($m/s$).
+* **$\Delta S_w$:** Water saturation change in pore space ($0.0 - 1.0$).
+* **$\Delta \rho$:** Bulk rock and fluid density change ($g/cm^3$).
+* **$\sigma$:** Predictive uncertainty associated with each estimated property.
 
-### As 4 Configurações de Entrada (Estudo de Ablation):
+### The 4 Input Configurations (Ablation Study Matrix):
 
-| Configuração | Total de Features | Detalhamento das Entradas (Inputs) |
+| Configuration | Total Features | Input Features Breakdown |
 | :--- | :---: | :--- |
-| **Config 1: Sem Static / Sem TS** | **32** | 16 Amplitudes Multi-Ângulo ($A_{\text{base}}, A_{\text{mon}}$ em 8 ângulos) + 8 Deltas $\Delta A$ + 8 Deltas Relativos $\frac{\Delta A}{\|A\|}$ |
-| **Config 2: Com Static / Sem TS** | **37** | 32 Amplitudes 4D + 5 Mapas Estáticos (Porosidade $\phi$, Argilosidade $V_{\text{sh}}$, Permeabilidades $K_x, K_y, K_z$) |
-| **Config 3: Sem Static / Com TS** | **36** | 32 Amplitudes 4D + 4 Mapas de Time-Shift Sísmico 4D ($dt$) |
-| **Config 4: Com Static / Com TS** | **41** | 32 Amplitudes 4D + 4 Time-Shift ($dt$) + 5 Mapas Estáticos de Rocha |
+| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes ($A_{\text{base}}, A_{\text{mon}}$ across 8 angles) + 8 Deltas $\Delta A$ + 8 Relative Deltas $\frac{\Delta A}{\|A\|}$ |
+| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps (Porosity $\phi$, Shale Volume $V_{\text{sh}}$, Permeabilities $K_x, K_y, K_z$) |
+| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps ($dt$) |
+| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift ($dt$) + 5 Static Rock Property Maps |
 
 ---
 
-## 3. Esquema de Validação Realista (26 Poços UNISIM-I + Campo Cego)
+## 3. Realistic Well Calibration Regime (26 UNISIM-I Wells + Blind Field CV)
 
-Em cenários reais de exploração e produção, redes neurais são calibradas **apenas nas localizações dos poços perfurados**, enquanto a predição deve cobrir todo o campo:
+In real exploration and production assets, models are trained **only on drilled well locations**, while predictions are deployed across the full 3D reservoir:
 
-* **Conjunto de Treino:** Fixado estritamente nos **26 poços canônicos do UNISIM-I** (`--train-traces 26 --trace-selection unisim_wells`) em todos os folds.
-* **Validação Cega (Out-of-Fold):** Os **37.935 traços restantes de reservatório** são divididos em 5 folds cegos para validação espacial estrita sem vazamento de dados (*data leakage*).
-* **Early Stopping:** Monitoramento da perda de validação com paciência configurável (`--patience 30`), salvando o melhor ponto de calibração.
-
----
-
-## 4. Execução Rápida via VS Code (`.vscode/launch.json`)
-
-O arquivo [`.vscode/launch.json`](.vscode/launch.json) contém configurações prontas para o painel **Run & Debug (F5)**:
-
-### Execução em Lote dos 4 Cenários + Plots Comparativos:
-* **`0. [RUN-ALL] Executar Todos os 4 Experimentos + Plots Comparativos (Aleatoric + Epistemic)`**
-* **`0. [RUN-ALL] Executar Todos os 4 Experimentos (Apenas Epistemic)`**
-* **`0. [RUN-ALL] Executar Todos os 4 Experimentos (Apenas Aleatoric)`**
-
-### Execuções Individuais por Cenário:
-* `1. [EXP-1] CV 5-Fold: Sem Static / Sem TS (Aleatoric)`
-* `2. [EXP-1] CV 5-Fold: Sem Static / Sem TS (Epistemic)`
-* `3. [EXP-2] CV 5-Fold: Com Static / Sem TS (Aleatoric)`
-* `4. [EXP-2] CV 5-Fold: Com Static / Sem TS (Epistemic)`
-* `5. [EXP-3] CV 5-Fold: Sem Static / Com TS (Aleatoric)`
-* `6. [EXP-3] CV 5-Fold: Sem Static / Com TS (Epistemic)`
-* `7. [EXP-4] CV 5-Fold: Com Static / Com TS (Aleatoric)`
-* `8. [EXP-4] CV 5-Fold: Com Static / Com TS (Epistemic)`
-* `9. [PLOT-COMPARE] Gerar Plots Comparativos dos 4 Cenários (Aleatoric)`
-* `10. [PLOT-COMPARE] Gerar Plots Comparativos dos 4 Cenários (Epistemic)`
+* **Training Set:** Strictly constrained to the **26 canonical UNISIM-I real wells** (`--train-traces 26 --trace-selection unisim_wells`) across all folds.
+* **Blind Validation (Out-of-Fold):** The remaining **37,935 reservoir traces** are divided into 5 blind folds for strict field validation without data leakage.
+* **Early Stopping & Annealing:** Validation loss monitoring with configurable patience (`--patience 30`), cosine annealing learning rate scheduler, and KL warmup.
 
 ---
 
-## 5. Linha de Comando (CLI)
+## 4. Run & Debug via VS Code (`.vscode/launch.json`)
 
-O pacote expõe o comando `bnn4d` via `uv run` ou `python -m bnn4d.cli`:
+The [`.vscode/launch.json`](.vscode/launch.json) file includes preconfigured tasks for the **Run & Debug (F5)** panel:
+
+### Batch Ablation Execution + Comparative Plots:
+* **`0. [RUN-ALL] Run All 4 Ablations + Generate Comparison Plots (Aleatoric + Epistemic)`**
+* **`0. [RUN-ALL] Run All 4 Ablations (Epistemic Only)`**
+* **`0. [RUN-ALL] Run All 4 Ablations (Aleatoric Only)`**
+
+### Individual Scenario Runs:
+* `1. [EXP-1] 5-Fold CV: No Static / No TS (Aleatoric)`
+* `2. [EXP-1] 5-Fold CV: No Static / No TS (Epistemic)`
+* `3. [EXP-2] 5-Fold CV: With Static / No TS (Aleatoric)`
+* `4. [EXP-2] 5-Fold CV: With Static / No TS (Epistemic)`
+* `5. [EXP-3] 5-Fold CV: No Static / With TS (Aleatoric)`
+* `6. [EXP-3] 5-Fold CV: No Static / With TS (Epistemic)`
+* `7. [EXP-4] 5-Fold CV: With Static / With TS (Aleatoric)`
+* `8. [EXP-4] 5-Fold CV: With Static / With TS (Epistemic)`
+* `9. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Aleatoric)`
+* `10. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Epistemic)`
+
+---
+
+## 5. Command-Line Interface (CLI)
+
+Run via `uv run` or `python -m bnn4d.cli`:
 
 ```bash
-# 1. Executar os 4 cenários de ablation sequencialmente e gerar plots comparativos
+# 1. Run all 4 ablation scenarios sequentially and generate comparison plots
 uv run python -m bnn4d.cli run-all-ablations \
   --data artifacts/unisim_4d.npz \
   --output-dir artifacts/ablation_study \
@@ -87,7 +87,7 @@ uv run python -m bnn4d.cli run-all-ablations \
   --epochs 150 \
   --patience 30
 
-# 2. Executar Cross-Validation de 5 folds para um modelo específico
+# 2. Run 5-Fold Cross-Validation for a specific configuration
 uv run python -m bnn4d.cli cv \
   --data artifacts/unisim_4d.npz \
   --output-dir artifacts/cv_epistemic_pure \
@@ -101,22 +101,23 @@ uv run python -m bnn4d.cli cv \
   --epochs 150 \
   --patience 30
 
-# 3. Gerar gráficos comparativos a partir de diretórios de experimentos existentes
+# 3. Generate comparative plots from existing experiment directories
 uv run python -m bnn4d.cli compare-ablations \
   --data artifacts/unisim_4d.npz \
   --experiments \
-    "1. Sem Static / Sem TS=artifacts/ablation_study/exp1_no_static_no_ts_epistemic" \
-    "2. Com Static / Sem TS=artifacts/ablation_study/exp2_with_static_no_ts_epistemic" \
-    "3. Sem Static / Com TS=artifacts/ablation_study/exp3_no_static_with_ts_epistemic" \
-    "4. Com Static / Com TS=artifacts/ablation_study/exp4_with_static_with_ts_epistemic" \
-  --output-dir artifacts/comparison_plots
+    "1. No Static / No TS=artifacts/ablation_study/exp1_no_static_no_ts_epistemic" \
+    "2. With Static / No TS=artifacts/ablation_study/exp2_with_static_no_ts_epistemic" \
+    "3. No Static / With TS=artifacts/ablation_study/exp3_no_static_with_ts_epistemic" \
+    "4. With Static / With TS=artifacts/ablation_study/exp4_with_static_with_ts_epistemic" \
+  --output-dir artifacts/ablation_study \
+  --model-name epistemic
 ```
 
 ---
 
-## 6. Testes Unitários
+## 6. Unit Tests
 
-Para rodar os testes da suíte de dados, modelos e visualizações:
+Run the full automated test suite:
 
 ```bash
 uv run python -m unittest discover -s tests -v

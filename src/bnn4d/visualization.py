@@ -384,10 +384,14 @@ def plot_4configs_comparison(
 
     # Define input descriptions for each standard configuration
     input_specs = {
-        "1. Sem Static / Sem TS": "ENTRADA: 32 Amplitudes 4D (Base, Mon, ΔA, ΔA/A)",
-        "2. Com Static / Sem TS": "ENTRADA: 37 Features (32 Ampl + 5 Estáticos φ, Vsh, K)",
-        "3. Sem Static / Com TS": "ENTRADA: 36 Features (32 Ampl + 4 Time-Shift dt)",
-        "4. Com Static / Com TS": "ENTRADA: 41 Features (32 Ampl + 4 dt + 5 Estáticos)",
+        "1. No Static / No TS": "INPUT: 32 4D Amplitudes (Base, Mon, ΔA, ΔA/A)",
+        "2. With Static / No TS": "INPUT: 37 Features (32 Ampl + 5 Static φ, Vsh, K)",
+        "3. No Static / With TS": "INPUT: 36 Features (32 Ampl + 4 Time-Shift dt)",
+        "4. With Static / With TS": "INPUT: 41 Features (32 Ampl + 4 dt + 5 Static)",
+        "1. Sem Static / Sem TS": "INPUT: 32 4D Amplitudes (Base, Mon, ΔA, ΔA/A)",
+        "2. Com Static / Sem TS": "INPUT: 37 Features (32 Ampl + 5 Static φ, Vsh, K)",
+        "3. Sem Static / Com TS": "INPUT: 36 Features (32 Ampl + 4 Time-Shift dt)",
+        "4. Com Static / Com TS": "INPUT: 41 Features (32 Ampl + 4 dt + 5 Static)",
     }
 
     for label, exp_dir in experiment_dirs.items():
@@ -449,7 +453,7 @@ def plot_4configs_comparison(
     ax_r.set_xticks(x)
     ax_r.set_xticklabels([f"Output: {p}" for p in property_names], fontsize=11, fontweight="bold")
     ax_r.set_ylabel("Parity Correlation (R)", fontsize=11, fontweight="bold")
-    ax_r.set_title("Parity Correlation (R) por Configuração de Entrada", fontsize=12, fontweight="bold")
+    ax_r.set_title("Parity Correlation (R) Across Input Configurations", fontsize=12, fontweight="bold")
     ax_r.set_ylim(0, 1.1)
     ax_r.grid(axis="y", linestyle="--", alpha=0.5)
     ax_r.legend(fontsize=9, loc="lower right")
@@ -457,19 +461,19 @@ def plot_4configs_comparison(
     ax_nrmse.set_xticks(x)
     ax_nrmse.set_xticklabels([f"Output: {p}" for p in property_names], fontsize=11, fontweight="bold")
     ax_nrmse.set_ylabel("Normalized RMSE (%)", fontsize=11, fontweight="bold")
-    ax_nrmse.set_title("Normalized RMSE (%) por Configuração de Entrada", fontsize=12, fontweight="bold")
+    ax_nrmse.set_title("Normalized RMSE (%) Across Input Configurations", fontsize=12, fontweight="bold")
     ax_nrmse.grid(axis="y", linestyle="--", alpha=0.5)
     ax_nrmse.legend(fontsize=9, loc="upper right")
 
-    # Bottom annotation panel: Detail Inputs and Outputs
+    # Bottom annotation panel: Detail Inputs and Outputs in English
     ax_info.axis("off")
     info_text = (
-        "ESPECIFICAÇÃO DE ENTRADAS E SAÍDAS DO MODELO:\n"
-        "• SAÍDAS (Targets Estimados): ΔVP (Variação de Velocidade P, m/s), ΔSw (Variação de Saturação de Água), Δρ (Variação de Densidade) + Incerteza (σ)\n"
-        "• ENTRADAS CONFIG 1 (Sem Static / Sem TS): 32 Atributos Sísmicos (Base 8 ângulos + Monitor 8 ângulos + ΔA 8 ângulos + Relativo ΔA/A 8 ângulos)\n"
-        "• ENTRADAS CONFIG 2 (Com Static / Sem TS): 37 Atributos (32 Sísmicos + 5 Mapas Estáticos: Porosidade φ, Vshale, Permeabilidade Kx, Ky, Kz)\n"
-        "• ENTRADAS CONFIG 3 (Sem Static / Com TS): 36 Atributos (32 Sísmicos + 4 Mapas de Time-Shift Sísmico 4D dt)\n"
-        "• ENTRADAS CONFIG 4 (Com Static / Com TS): 41 Atributos (32 Sísmicos + 4 Time-Shift dt + 5 Mapas Estáticos de Rocha)"
+        "MODEL INPUT & OUTPUT SPECIFICATIONS:\n"
+        "• TARGET OUTPUTS: ΔVP (P-Wave Velocity Change, m/s), ΔSw (Water Saturation Change), Δρ (Bulk Density Change) + Uncertainty (σ)\n"
+        "• CONFIG 1 (No Static / No TS): 32 Seismic Attributes (Base 8 angles + Monitor 8 angles + ΔA 8 angles + Relative ΔA/A 8 angles)\n"
+        "• CONFIG 2 (With Static / No TS): 37 Attributes (32 Seismic + 5 Static Maps: Porosity φ, Vshale, Permeabilities Kx, Ky, Kz)\n"
+        "• CONFIG 3 (No Static / With TS): 36 Attributes (32 Seismic + 4 Seismic 4D Time-Shift Maps dt)\n"
+        "• CONFIG 4 (With Static / With TS): 41 Attributes (32 Seismic + 4 Time-Shift dt + 5 Static Rock Property Maps)"
     )
     ax_info.text(0.01, 0.5, info_text, fontsize=9.5, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
 
@@ -500,20 +504,20 @@ def plot_4configs_comparison(
 
         # Column 0: Ground Truth
         im_gt = axes_prop[0, 0].imshow(t_prop, cmap=cmap_name, vmin=p_vmin, vmax=p_vmax, origin="lower")
-        axes_prop[0, 0].set_title(f"GROUND TRUTH\nAlvo Real: {prop_name}", fontsize=10, fontweight="bold", pad=8)
-        axes_prop[0, 0].set_ylabel(f"SAÍDA 1:\nPredição ({prop_name})", fontsize=10, fontweight="bold")
+        axes_prop[0, 0].set_title(f"GROUND TRUTH\nTrue Target: {prop_name}", fontsize=10, fontweight="bold", pad=8)
+        axes_prop[0, 0].set_ylabel(f"OUTPUT 1:\nPrediction ({prop_name})", fontsize=10, fontweight="bold")
         fig_prop.colorbar(im_gt, ax=axes_prop[0, 0], shrink=0.75)
         axes_prop[1, 0].axis("off")
         axes_prop[1, 0].text(
             0.5, 0.5,
-            f"Ground Truth: {prop_name}\nReferência Real\n(26 Poços Treino\n37.935 Validação)",
+            f"Ground Truth: {prop_name}\nTrue Reference\n(26 Well Train\n37,935 Validation)",
             ha="center", va="center", fontsize=9.5, fontweight="bold",
             transform=axes_prop[1, 0].transAxes,
             bbox=dict(boxstyle="round,pad=0.5", facecolor="#e9ecef", edgecolor="#adb5bd")
         )
 
         for c_idx, label in enumerate(config_labels, start=1):
-            in_desc = input_specs.get(label, f"Entrada: {label}")
+            in_desc = input_specs.get(label, f"Input: {label}")
             if label in loaded_preds:
                 p_map = loaded_preds[label][..., prop_idx]
                 u_map = loaded_uncs[label][..., prop_idx]
@@ -526,10 +530,10 @@ def plot_4configs_comparison(
                 u_finite = u_disp[np.isfinite(u_disp)]
                 u_max = float(np.nanpercentile(u_finite, 99)) if len(u_finite) > 0 else 0.1
                 im_u = axes_prop[1, c_idx].imshow(u_disp, cmap="magma", vmin=0, vmax=max(u_max, 1e-4), origin="lower")
-                axes_prop[1, c_idx].set_title(f"Incerteza Preditiva (σ):\n{label}", fontsize=8.2, fontweight="bold", pad=6)
+                axes_prop[1, c_idx].set_title(f"Predictive Uncertainty (σ):\n{label}", fontsize=8.2, fontweight="bold", pad=6)
                 fig_prop.colorbar(im_u, ax=axes_prop[1, c_idx], shrink=0.75)
 
-        axes_prop[1, 1].set_ylabel(f"SAÍDA 2:\nIncerteza σ({prop_name})", fontsize=10, fontweight="bold")
+        axes_prop[1, 1].set_ylabel(f"OUTPUT 2:\nUncertainty σ({prop_name})", fontsize=10, fontweight="bold")
 
         for ax_row in axes_prop:
             for ax in ax_row:
