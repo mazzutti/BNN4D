@@ -8,26 +8,31 @@ Python/PyTorch implementation of the 4D seismic reservoir property estimation an
 
 * **Realistic 26-Well Calibration Regime:** Models are trained **strictly on 26 canonical UNISIM-I wells** (`n_traces=26, method='unisim_wells'`), predicting across **37,935 blind reservoir traces** evaluated via 5-Fold Cross-Validation.
 * **Res-BNN Architecture:** Integrates residual skip-connections into variational Gaussian dense layers, eliminating gradient vanishing on sparse well calibrations and accelerating convergence.
-* **Uncoupling 4D Dynamics via Time-Shift ($dt$):** 4D time-shifts resolve the intrinsic acoustic ambiguity between pressure decrease and water saturation increase, driving parity correlation to **$R = 0.983$** on $\Delta V_P$ and **$R > 0.945$** on $\Delta S_w$ and $\Delta \rho$, with Normalized RMSE dropping to **$2.53\%$**.
+* **Uncoupling 4D Dynamics via Time-Shift (dt):** 4D time-shifts resolve the intrinsic acoustic ambiguity between pressure decrease and water saturation increase, driving parity correlation to **R = 0.983** on ΔVP and **R > 0.945** on ΔSw and Δρ, with Normalized RMSE dropping to **2.53%**.
 * **Dual Uncertainty Quantification:**
-  * **Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$):** Captures heteroscedastic data noise and measurement imperfections.
-  * **Epistemic Uncertainty ($\sigma_{\text{epistemic}}$):** Quantifies model parameter ambiguity via Monte Carlo variational draws ($S=50\dots 200$), highlighting faults and un-swept compartments.
+  * **Aleatoric Uncertainty (σ_aleatoric):** Captures heteroscedastic data noise and measurement imperfections.
+  * **Epistemic Uncertainty (σ_epistemic):** Quantifies model parameter ambiguity via Monte Carlo variational draws (S = 50...200), highlighting faults and un-swept compartments.
 
 ---
 
 ## 2. Architecture & Theoretical Formulation
 
 ### A. Epistemic Model (`EpistemicBNN` / Res-BNN)
-Every dense layer is formulated with stochastic variational Gaussian weights:
-$$w_{ij} \sim \mathcal{N}(\mu_{ij}, \sigma_{ij}^2), \quad \sigma_{ij} = \text{softplus}(\rho_{ij})$$
-
-Optimized via the Variational Free Energy (ELBO) with KL annealing warmup:
-$$\mathcal{L}_{\text{epistemic}} = \frac{1}{B} \sum_{i=1}^B \|y_i - f(x_i; w)\|^2 + \beta_{\text{KL}}(t) \cdot \text{KL}(q(w) \| p(w))$$
-where $\beta_{\text{KL}}(t) = \min\left(1.0, \frac{t}{25}\right) \cdot \frac{1}{N_{\text{samples}}}$ scales the Gaussian prior $\mathcal{N}(0, \sigma_0^2 I)$.
+Every dense layer is formulated with stochastic variational Gaussian weight distributions:
+* **Weight Distribution:** `w ~ Normal(μ_w, σ_w²)` where `σ_w = softplus(ρ_w)`
+* **Prior Distribution:** Standard Gaussian `p(w) = Normal(0, σ_0² I)`
+* **Objective Function (Variational Free Energy / ELBO with KL Warmup):**
+  ```text
+  Loss_epistemic = (1/B) * Σ ||y_i - f(x_i; w)||^2 + β_KL(t) * KL(q(w) || p(w))
+  ```
+  where `β_KL(t) = min(1.0, epoch / 25) * (1 / N_samples)` dynamically scales the KL regularizer during initial epochs.
 
 ### B. Aleatoric Model (`AleatoricAutoencoder`)
-Deep feedforward network with dual output heads $(\mu(x), \log \sigma^2(x))$, optimized with Heteroscedastic Gaussian Negative Log-Likelihood:
-$$\mathcal{L}_{\text{aleatoric}} = \frac{1}{2B} \sum_{i=1}^B \left( \frac{\|y_i - \mu(x_i)\|^2}{\sigma^2(x_i)} + \log \sigma^2(x_i) \right)$$
+Deep feedforward architecture with dual output heads predicting mean `μ(x)` and heteroscedastic log-variance `log(σ²(x))`:
+* **Objective Function (Heteroscedastic Gaussian Negative Log-Likelihood):**
+  ```text
+  Loss_aleatoric = (1 / 2B) * Σ [ ||y_i - μ(x_i)||^2 / σ²(x_i) + log(σ²(x_i)) ]
+  ```
 
 ---
 
@@ -35,12 +40,12 @@ $$\mathcal{L}_{\text{aleatoric}} = \frac{1}{2B} \sum_{i=1}^B \left( \frac{\|y_i 
 
 The 4 ablation configurations evaluate the incremental impact of pure 4D amplitudes, static geology maps, and 4D seismic time-shifts:
 
-| Ablation Scenario | Total Features | Inputs Description | $\Delta V_P$ ($R$ / NRMSE) | $\Delta S_w$ ($R$ / NRMSE) | $\Delta \rho$ ($R$ / NRMSE) | Mean $R$ | Mean NRMSE |
+| Ablation Scenario | Features | Input Features Breakdown | ΔVP (R / NRMSE) | ΔSw (R / NRMSE) | Δρ (R / NRMSE) | Mean R | Mean NRMSE |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes ($A_{\text{base}}, A_{\text{mon}}$ 8 angles) + 8 Deltas $\Delta A$ + 8 Rel. Deltas $\frac{\Delta A}{\|A\|}$ | $0.7517$ / $9.19\%$ | $0.7382$ / $11.02\%$ | $0.7540$ / $10.36\%$ | **$0.7480$** | **$10.19\%$** |
-| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps ($\phi, V_{\text{sh}}, K_x, K_y, K_z$) | $0.7699$ / $8.87\%$ | $0.7540$ / $10.69\%$ | $0.7790$ / $9.97\%$ | **$0.7676$** | **$9.84\%$** |
-| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps ($dt$) | **$0.9832$** / **$2.53\%$** | **$0.9450$** / **$5.31\%$** | **$0.9464$** / **$5.05\%$** | **$0.9582$** | **$4.30\%$** |
-| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift ($dt$) + 5 Static Geology Maps | **$0.9697$** / **$3.34\%$** | **$0.9416$** / **$5.37\%$** | **$0.9538$** / **$4.66\%$** | **$0.9550$** | **$4.46\%$** |
+| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes (Base, Mon 8 angles) + 8 Deltas ΔA + 8 Rel. Deltas ΔA/\|A\| | 0.7517 / 9.19% | 0.7382 / 11.02% | 0.7540 / 10.36% | **0.7480** | **10.19%** |
+| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps (Porosity φ, Vshale, Permeabilities Kx, Ky, Kz) | 0.7699 / 8.87% | 0.7540 / 10.69% | 0.7790 / 9.97% | **0.7676** | **9.84%** |
+| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9832** / **2.53%** | **0.9450** / **5.31%** | **0.9464** / **5.05%** | **0.9582** | **4.30%** |
+| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift (dt) + 5 Static Geology Maps | **0.9697** / **3.34%** | **0.9416** / **5.37%** | **0.9538** / **4.66%** | **0.9550** | **4.46%** |
 
 ---
 
@@ -49,22 +54,22 @@ The 4 ablation configurations evaluate the incremental impact of pure 4D amplitu
 ---
 
 ### 4.1 Epistemic BNN Model Results (`EpistemicBNN` / Res-BNN)
-> **Model Formulation:** Fully Variational Bayesian Neural Network with Gaussian weight distributions $w \sim \mathcal{N}(\mu_w, \sigma_w^2)$. Epistemic uncertainty $\sigma_{\text{epistemic}}$ is evaluated through $S = 50\dots 200$ Monte Carlo variational forward passes on the 37,935 blind field traces.
+> **Model Formulation:** Fully Variational Bayesian Neural Network with Gaussian weight distributions `w ~ Normal(μ_w, σ_w²)`. Epistemic uncertainty `σ_epistemic` is evaluated through `S = 50...200` Monte Carlo variational forward passes on the 37,935 blind field traces.
 
-#### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
+#### A. Parity Correlation (R) & Normalized RMSE Metrics Across Configurations
 ![Epistemic Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_epistemic.png)
 
 #### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
-Spatial comparison for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row):
+Spatial comparison for ΔVP (top row), ΔSw (middle row), and Δρ (bottom row):
 ![Epistemic All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_epistemic_all_properties.png)
 
-#### C. Water Saturation Change ($\Delta S_w$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+#### C. Water Saturation Change (ΔSw) & Epistemic Uncertainty (σ_epistemic)
 ![Epistemic Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dsw.png)
 
-#### D. Compressional Velocity Change ($\Delta V_P$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+#### D. Compressional Velocity Change (ΔVP) & Epistemic Uncertainty (σ_epistemic)
 ![Epistemic Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dvp.png)
 
-#### E. Bulk Density Change ($\Delta \rho$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+#### E. Bulk Density Change (Δρ) & Epistemic Uncertainty (σ_epistemic)
 ![Epistemic Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
 
 #### F. Inversion Decoupling & EAGE Benchmark Validation (Config 3: No Static / With TS)
@@ -84,22 +89,22 @@ Parity regression scatter plots and residual histograms for all 37,935 blind val
 ---
 
 ### 4.2 Aleatoric Model Results (`AleatoricAutoencoder` with Heteroscedastic Noise Head)
-> **Model Formulation:** Deterministic feedforward network with dual output heads predicting $(\mu(x), \log \sigma^2(x))$. Aleatoric uncertainty $\sigma_{\text{aleatoric}}$ directly models heteroscedastic observation noise and seismic attribute noise.
+> **Model Formulation:** Deterministic feedforward network with dual output heads predicting `(μ(x), log(σ²(x)))`. Aleatoric uncertainty `σ_aleatoric` directly models heteroscedastic observation noise and seismic attribute noise.
 
-#### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
+#### A. Parity Correlation (R) & Normalized RMSE Metrics Across Configurations
 ![Aleatoric Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_aleatoric.png)
 
 #### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
-Spatial comparison for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row):
+Spatial comparison for ΔVP (top row), ΔSw (middle row), and Δρ (bottom row):
 ![Aleatoric All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_aleatoric_all_properties.png)
 
-#### C. Water Saturation Change ($\Delta S_w$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+#### C. Water Saturation Change (ΔSw) & Aleatoric Uncertainty (σ_aleatoric)
 ![Aleatoric Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dsw.png)
 
-#### D. Compressional Velocity Change ($\Delta V_P$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+#### D. Compressional Velocity Change (ΔVP) & Aleatoric Uncertainty (σ_aleatoric)
 ![Aleatoric Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dvp.png)
 
-#### E. Bulk Density Change ($\Delta \rho$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+#### E. Bulk Density Change (Δρ) & Aleatoric Uncertainty (σ_aleatoric)
 ![Aleatoric Density Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_drho.png)
 
 ---
@@ -112,15 +117,15 @@ Comparison of the 26 canonical UNISIM-I real well training positions against spa
 
 ## 5. Geophysical Interpretation of Results
 
-1. **Why Pure Amplitudes (Configs 1 & 2) Plateau at $R \approx 0.75 - 0.78$:**
-   * In multi-angle seismic amplitudes, water saturation increase ($\Delta S_w > 0$) causes an acoustic impedance hardening, while pore pressure increase ($\Delta P > 0$) causes acoustic softening.
+1. **Why Pure Amplitudes (Configs 1 & 2) Plateau at R ≈ 0.75 - 0.78:**
+   * In multi-angle seismic amplitudes, water saturation increase (ΔSw > 0) causes an acoustic impedance hardening, while pore pressure increase (ΔP > 0) causes acoustic softening.
    * Without traveltime information, amplitude-only inversion encounters cross-talk between pressure and saturation.
-2. **Why 4D Time-Shift ($dt$) Propels Performance to $R > 0.98$:**
-   * 4D traveltime shifts ($dt$) directly integrate reservoir velocity changes and dilational strain throughout the overburden and reservoir layer.
-   * This decoupled kinematic signature enables the Res-BNN to map $\Delta V_P$ with **$2.53\%$ NRMSE** and $\Delta S_w, \Delta \rho$ with **$< 5.3\%$ NRMSE**.
-3. **Role of Predictive Uncertainty ($\sigma$):**
-   * **Epistemic Uncertainty ($\sigma_{\text{epistemic}}$):** High in inter-well regions farthest from the 26 calibration wells, highlighting uncalibrated compartments.
-   * **Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$):** Highlights structural discontinuities, fault scarps, and low signal-to-noise seismic zones.
+2. **Why 4D Time-Shift (dt) Propels Performance to R > 0.98:**
+   * 4D traveltime shifts (dt) directly integrate reservoir velocity changes and dilational strain throughout the overburden and reservoir layer.
+   * This decoupled kinematic signature enables the Res-BNN to map ΔVP with **2.53% NRMSE** and ΔSw, Δρ with **< 5.3% NRMSE**.
+3. **Role of Predictive Uncertainty (σ):**
+   * **Epistemic Uncertainty (σ_epistemic):** High in inter-well regions farthest from the 26 calibration wells, highlighting uncalibrated compartments.
+   * **Aleatoric Uncertainty (σ_aleatoric):** Highlights structural discontinuities, fault scarps, and low signal-to-noise seismic zones.
 
 ---
 
