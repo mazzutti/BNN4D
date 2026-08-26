@@ -28,7 +28,7 @@ def _activation(name: str) -> Callable[[], nn.Module]:
 
 
 class AleatoricAutoencoder(nn.Module):
-    """Deterministic encoder-decoder with heteroscedastic Gaussian output.
+    """Deterministic encoder-decoder with heteroscedastic Gaussian output and residual connections.
 
     It returns three property means (dP, dSw, dSg) and their log variances.
     Log variance is clamped only when requested; clamping prevents numerical
@@ -42,6 +42,7 @@ class AleatoricAutoencoder(nn.Module):
         widths: Sequence[int] = PAPER_WIDTHS,
         activation: str = "relu",
         log_variance_bounds: tuple[float, float] | None = (-20.0, 10.0),
+        residual: bool = True,
     ) -> None:
         super().__init__()
         if input_dim < 1 or output_dim < 1:
@@ -49,23 +50,33 @@ class AleatoricAutoencoder(nn.Module):
         if not widths:
             raise ValueError("widths must contain at least the latent layer")
         act = _activation(activation)
-        layers: list[nn.Module] = []
-        previous = input_dim
-        for width in widths:
-            layers.extend((nn.Linear(previous, width), act()))
-            previous = width
-        self.backbone = nn.Sequential(*layers)
-        self.mean_head = nn.Linear(previous, output_dim)
-        self.log_variance_head = nn.Linear(previous, output_dim)
+        self.residual = residual
+        dimensions = (input_dim, *widths)
+        self.linear_layers = nn.ModuleList([nn.Linear(a, b) for a, b in zip(dimensions[:-1], dimensions[1:])])
+        self.proj_layers = nn.ModuleList([
+            nn.Linear(a, b, bias=False) if (residual and a != b) else None
+            for a, b in zip(dimensions[:-1], dimensions[1:])
+        ])
+        self.activation = act()
+        self.mean_head = nn.Linear(widths[-1], output_dim)
+        self.log_variance_head = nn.Linear(widths[-1], output_dim)
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.widths = tuple(widths)
         self.log_variance_bounds = log_variance_bounds
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
-        hidden = self.backbone(x)
-        mean = self.mean_head(hidden)
-        log_variance = self.log_variance_head(hidden)
+        h = x
+        for linear, proj in zip(self.linear_layers, self.proj_layers):
+            res = h
+            out = self.activation(linear(h))
+            if self.residual:
+                if proj is not None:
+                    res = proj(res)
+                out = out + res
+            h = out
+        mean = self.mean_head(h)
+        log_variance = self.log_variance_head(h)
         if self.log_variance_bounds is not None:
             log_variance = log_variance.clamp(*self.log_variance_bounds)
         return mean, log_variance
@@ -144,7 +155,7 @@ class VariationalLinear(nn.Module):
 
 
 class EpistemicBNN(nn.Module):
-    """Fully variational form of every dense layer in the paper's network."""
+    """Fully variational form of every dense layer with residual connections (Res-BNN)."""
 
     def __init__(
         self,
@@ -153,15 +164,21 @@ class EpistemicBNN(nn.Module):
         widths: Sequence[int] = PAPER_WIDTHS,
         activation: str = "relu",
         prior_std: float = 1.0,
+        residual: bool = True,
     ) -> None:
         super().__init__()
         if input_dim < 1 or output_dim < 1:
             raise ValueError("input_dim and output_dim must be positive")
         act = _activation(activation)
+        self.residual = residual
         dimensions = (input_dim, *widths, output_dim)
         self.layers = nn.ModuleList(
             VariationalLinear(a, b, prior_std) for a, b in zip(dimensions[:-1], dimensions[1:])
         )
+        self.proj_layers = nn.ModuleList([
+            nn.Linear(a, b, bias=False) if (residual and a != b) else None
+            for a, b in zip(dimensions[:-2], dimensions[1:-1])
+        ])
         self.activation = act()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -179,9 +196,17 @@ class EpistemicBNN(nn.Module):
             layer.clear_sample()
 
     def forward(self, x: Tensor, sample: bool = True) -> Tensor:
-        for layer in self.layers[:-1]:
-            x = self.activation(layer(x, sample=sample))
-        return self.layers[-1](x, sample=sample)
+        h = x
+        for i, layer in enumerate(self.layers[:-1]):
+            res = h
+            out = self.activation(layer(h, sample=sample))
+            if self.residual:
+                proj = self.proj_layers[i]
+                if proj is not None:
+                    res = proj(res)
+                out = out + res
+            h = out
+        return self.layers[-1](h, sample=sample)
 
     def kl_divergence(self) -> Tensor:
         return torch.stack([layer.kl_divergence() for layer in self.layers]).sum()

@@ -48,6 +48,19 @@ class ModelTests(unittest.TestCase):
         total, fit, complexity = variational_free_energy(draws[0], torch.zeros(4, 3), model.kl_divergence(), 100)
         self.assertTrue(torch.allclose(total, fit + complexity))
 
+    def test_residual_connections(self):
+        for res in [True, False]:
+            al = AleatoricAutoencoder(8, output_dim=3, widths=(16, 8, 16), residual=res)
+            x = torch.randn(4, 8)
+            mean, log_var = al(x)
+            self.assertEqual(mean.shape, (4, 3))
+            self.assertEqual(log_var.shape, (4, 3))
+
+            ep = EpistemicBNN(8, output_dim=3, widths=(16, 8, 16), residual=res)
+            out = ep(x, sample=True)
+            self.assertEqual(out.shape, (4, 3))
+            self.assertGreater(ep.kl_divergence().item(), 0)
+
 
 class DataTests(unittest.TestCase):
     def test_sliding_window_layout(self):
