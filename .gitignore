@@ -10,8 +10,3 @@ __pycache__
 **/__pycache__
 *.pdf
 *.egg-info/
-artifacts/*.pt
-artifacts/*.npz
-artifacts/cv_*
-artifacts/exp*
-artifacts/ablation_study/
