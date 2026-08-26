@@ -46,38 +46,67 @@ The 4 ablation configurations evaluate the incremental impact of pure 4D amplitu
 
 ## 4. Visualizations & Comparative Analysis
 
-### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
-Comparison of Out-of-Fold parity correlation ($R$) and Normalized RMSE (%) across all 4 configurations for the Epistemic model:
+---
 
-![Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_epistemic.png)
+### 4.1 Epistemic BNN Model Results (`EpistemicBNN` / Res-BNN)
+> **Model Formulation:** Fully Variational Bayesian Neural Network with Gaussian weight distributions $w \sim \mathcal{N}(\mu_w, \sigma_w^2)$. Epistemic uncertainty $\sigma_{\text{epistemic}}$ is evaluated through $S = 50\dots 200$ Monte Carlo variational forward passes on the 37,935 blind field traces.
+
+#### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
+![Epistemic Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_epistemic.png)
+
+#### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
+Spatial comparison for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row):
+![Epistemic All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_epistemic_all_properties.png)
+
+#### C. Water Saturation Change ($\Delta S_w$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+![Epistemic Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dsw.png)
+
+#### D. Compressional Velocity Change ($\Delta V_P$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+![Epistemic Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dvp.png)
+
+#### E. Bulk Density Change ($\Delta \rho$) & Epistemic Uncertainty ($\sigma_{\text{epistemic}}$)
+![Epistemic Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
+
+#### F. Inversion Decoupling & EAGE Benchmark Validation (Config 3: No Static / With TS)
+Cross-property inversion parity, saturation front tracking, and velocity change recovery:
+![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_eage_comparison.png)
+
+#### G. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Config 3: Epistemic)
+Parity regression scatter plots and residual histograms for all 37,935 blind validation traces:
+![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_diagnostics.png)
+
+#### H. Spatial Absolute Error Maps Across the Reservoir (Config 3: Epistemic)
+![Epistemic Error Maps](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_error_maps.png)
+
+#### I. 5-Fold Training & Validation Loss History (Config 3: Epistemic)
+![Epistemic Training History](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_training_history.png)
 
 ---
 
-### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
-Spatial predictions for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row) compared against Ground Truth across all 37,935 blind field traces:
+### 4.2 Aleatoric Model Results (`AleatoricAutoencoder` with Heteroscedastic Noise Head)
+> **Model Formulation:** Deterministic feedforward network with dual output heads predicting $(\mu(x), \log \sigma^2(x))$. Aleatoric uncertainty $\sigma_{\text{aleatoric}}$ directly models heteroscedastic observation noise and seismic attribute noise.
 
-![All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_epistemic_all_properties.png)
+#### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
+![Aleatoric Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_aleatoric.png)
+
+#### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
+Spatial comparison for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row):
+![Aleatoric All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_aleatoric_all_properties.png)
+
+#### C. Water Saturation Change ($\Delta S_w$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+![Aleatoric Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dsw.png)
+
+#### D. Compressional Velocity Change ($\Delta V_P$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+![Aleatoric Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dvp.png)
+
+#### E. Bulk Density Change ($\Delta \rho$) & Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$)
+![Aleatoric Density Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_drho.png)
 
 ---
 
-### C. Water Saturation Change ($\Delta S_w$) & Epistemic Uncertainty ($\sigma$)
-Comparison of $\Delta S_w$ sweep front tracking and associated predictive uncertainty ($\sigma$):
-
-![Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dsw.png)
-
----
-
-### D. Compressional Velocity Change ($\Delta V_P$) & Epistemic Uncertainty ($\sigma$)
-Comparison of $\Delta V_P$ (m/s) predictions across configurations:
-
-![Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dvp.png)
-
----
-
-### E. Bulk Density Change ($\Delta \rho$) & Epistemic Uncertainty ($\sigma$)
-Comparison of $\Delta \rho$ (bulk rock/fluid density change) predictions across configurations:
-
-![Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
+### 4.3 Calibration Well Layout & Spatial Geometry
+Comparison of the 26 canonical UNISIM-I real well training positions against spatial-optimal and pseudo-random distributions:
+![Well Selection Comparison](artifacts/trace_selection_comparison.png)
 
 ---
 
@@ -90,7 +119,8 @@ Comparison of $\Delta \rho$ (bulk rock/fluid density change) predictions across 
    * 4D traveltime shifts ($dt$) directly integrate reservoir velocity changes and dilational strain throughout the overburden and reservoir layer.
    * This decoupled kinematic signature enables the Res-BNN to map $\Delta V_P$ with **$2.53\%$ NRMSE** and $\Delta S_w, \Delta \rho$ with **$< 5.3\%$ NRMSE**.
 3. **Role of Predictive Uncertainty ($\sigma$):**
-   * Uncertainty maps $\sigma(x)$ consistently peak along complex fault boundaries, channel edges, and inter-well regions farthest from the 26 calibration wells.
+   * **Epistemic Uncertainty ($\sigma_{\text{epistemic}}$):** High in inter-well regions farthest from the 26 calibration wells, highlighting uncalibrated compartments.
+   * **Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$):** Highlights structural discontinuities, fault scarps, and low signal-to-noise seismic zones.
 
 ---
 
