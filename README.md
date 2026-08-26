@@ -1,66 +1,106 @@
 # BNN4D: Bayesian Neural Networks for 4D Seismic Inversion
 
-Python/PyTorch implementation of the 4D seismic reservoir property estimation and uncertainty quantification framework based on **Sukar, Côrte & MacBeth (2026)** (*“Dynamic Reservoir Property Estimation With Uncertainty Quantification From 4D Seismic Data Using Bayesian Neural Networks”*), adapted for the **UNISIM-I** benchmark reservoir.
+Python/PyTorch implementation of the 4D seismic reservoir property estimation and uncertainty quantification framework based on **Sukar, Côrte & MacBeth (2026)** (*“Dynamic Reservoir Property Estimation With Uncertainty Quantification From 4D Seismic Data Using Bayesian Neural Networks”*), adapted and evaluated on the **UNISIM-I** benchmark reservoir.
 
 ---
 
-## 1. Architecture & Modeling
+## 1. Executive Summary & Key Highlights
 
-The codebase provides two complementary Bayesian deep learning approaches to invert 4D seismic attributes directly into dynamic reservoir property changes with calibrated uncertainty estimates:
-
-1. **Aleatoric Model (`AleatoricAutoencoder` with Residual Skip-Connections):**
-   - Deep feedforward neural network with dual output heads: $\mu(x)$ (predictive mean) and $\log \sigma^2(x)$ (heteroscedastic log-variance of observation noise).
-   - Optimized via Heteroscedastic Gaussian Negative Log-Likelihood:
-     $$\mathcal{L}_{\text{aleatoric}} = \frac{1}{2N} \sum_{i=1}^N \left( \frac{\|y_i - \mu(x_i)\|^2}{\sigma^2(x_i)} + \log \sigma^2(x_i) \right)$$
-
-2. **Epistemic Model (`EpistemicBNN` / Res-BNN):**
-   - Fully variational Bayesian Neural Network where **all dense layers contain stochastic Gaussian weight distributions** $w \sim \mathcal{N}(\mu_w, \sigma_w^2)$.
-   - Standard Gaussian prior $\mathcal{N}(0, \sigma_0^2 I)$.
-   - Optimized via Variational Free Energy / ELBO with $\text{KL}(q(w) \| p(w))$ divergence regularizer and KL annealing warmup.
-   - Inference via **Monte Carlo Variational Sampling**: $S$ stochastic draws estimate posterior expectation $\mathbb{E}[y]$ and epistemic model uncertainty $\sigma_{\text{epistemic}} = \text{std}(y^{(s)})$.
+* **Realistic 26-Well Calibration Regime:** Models are trained **strictly on 26 canonical UNISIM-I wells** (`n_traces=26, method='unisim_wells'`), predicting across **37,935 blind reservoir traces** evaluated via 5-Fold Cross-Validation.
+* **Res-BNN Architecture:** Integrates residual skip-connections into variational Gaussian dense layers, eliminating gradient vanishing on sparse well calibrations and accelerating convergence.
+* **Uncoupling 4D Dynamics via Time-Shift ($dt$):** 4D time-shifts resolve the intrinsic acoustic ambiguity between pressure decrease and water saturation increase, driving parity correlation to **$R = 0.983$** on $\Delta V_P$ and **$R > 0.945$** on $\Delta S_w$ and $\Delta \rho$, with Normalized RMSE dropping to **$2.53\%$**.
+* **Dual Uncertainty Quantification:**
+  * **Aleatoric Uncertainty ($\sigma_{\text{aleatoric}}$):** Captures heteroscedastic data noise and measurement imperfections.
+  * **Epistemic Uncertainty ($\sigma_{\text{epistemic}}$):** Quantifies model parameter ambiguity via Monte Carlo variational draws ($S=50\dots 200$), highlighting faults and un-swept compartments.
 
 ---
 
-## 2. Model Inputs & Outputs
+## 2. Architecture & Theoretical Formulation
 
-### Target Outputs:
-The models simultaneously predict 3 dynamic petroelastic property changes between base and monitor surveys, alongside spatial uncertainty maps $\sigma$:
-* **$\Delta V_P$:** P-wave compressional velocity change ($m/s$).
-* **$\Delta S_w$:** Water saturation change in pore space ($0.0 - 1.0$).
-* **$\Delta \rho$:** Bulk rock and fluid density change ($g/cm^3$).
-* **$\sigma$:** Predictive uncertainty associated with each estimated property.
+### A. Epistemic Model (`EpistemicBNN` / Res-BNN)
+Every dense layer is formulated with stochastic variational Gaussian weights:
+$$w_{ij} \sim \mathcal{N}(\mu_{ij}, \sigma_{ij}^2), \quad \sigma_{ij} = \text{softplus}(\rho_{ij})$$
 
-### The 4 Input Configurations (Ablation Study Matrix):
+Optimized via the Variational Free Energy (ELBO) with KL annealing warmup:
+$$\mathcal{L}_{\text{epistemic}} = \frac{1}{B} \sum_{i=1}^B \|y_i - f(x_i; w)\|^2 + \beta_{\text{KL}}(t) \cdot \text{KL}(q(w) \| p(w))$$
+where $\beta_{\text{KL}}(t) = \min\left(1.0, \frac{t}{25}\right) \cdot \frac{1}{N_{\text{samples}}}$ scales the Gaussian prior $\mathcal{N}(0, \sigma_0^2 I)$.
 
-| Configuration | Total Features | Input Features Breakdown |
-| :--- | :---: | :--- |
-| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes ($A_{\text{base}}, A_{\text{mon}}$ across 8 angles) + 8 Deltas $\Delta A$ + 8 Relative Deltas $\frac{\Delta A}{\|A\|}$ |
-| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps (Porosity $\phi$, Shale Volume $V_{\text{sh}}$, Permeabilities $K_x, K_y, K_z$) |
-| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps ($dt$) |
-| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift ($dt$) + 5 Static Rock Property Maps |
+### B. Aleatoric Model (`AleatoricAutoencoder`)
+Deep feedforward network with dual output heads $(\mu(x), \log \sigma^2(x))$, optimized with Heteroscedastic Gaussian Negative Log-Likelihood:
+$$\mathcal{L}_{\text{aleatoric}} = \frac{1}{2B} \sum_{i=1}^B \left( \frac{\|y_i - \mu(x_i)\|^2}{\sigma^2(x_i)} + \log \sigma^2(x_i) \right)$$
 
 ---
 
-## 3. Realistic Well Calibration Regime (26 UNISIM-I Wells + Blind Field CV)
+## 3. 4-Scenario Ablation Study: Quantitative Results
 
-In real exploration and production assets, models are trained **only on drilled well locations**, while predictions are deployed across the full 3D reservoir:
+The 4 ablation configurations evaluate the incremental impact of pure 4D amplitudes, static geology maps, and 4D seismic time-shifts:
 
-* **Training Set:** Strictly constrained to the **26 canonical UNISIM-I real wells** (`--train-traces 26 --trace-selection unisim_wells`) across all folds.
-* **Blind Validation (Out-of-Fold):** The remaining **37,935 reservoir traces** are divided into 5 blind folds for strict field validation without data leakage.
-* **Early Stopping & Annealing:** Validation loss monitoring with configurable patience (`--patience 30`), cosine annealing learning rate scheduler, and KL warmup.
+| Ablation Scenario | Total Features | Inputs Description | $\Delta V_P$ ($R$ / NRMSE) | $\Delta S_w$ ($R$ / NRMSE) | $\Delta \rho$ ($R$ / NRMSE) | Mean $R$ | Mean NRMSE |
+| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
+| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes ($A_{\text{base}}, A_{\text{mon}}$ 8 angles) + 8 Deltas $\Delta A$ + 8 Rel. Deltas $\frac{\Delta A}{\|A\|}$ | $0.7517$ / $9.19\%$ | $0.7382$ / $11.02\%$ | $0.7540$ / $10.36\%$ | **$0.7480$** | **$10.19\%$** |
+| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps ($\phi, V_{\text{sh}}, K_x, K_y, K_z$) | $0.7699$ / $8.87\%$ | $0.7540$ / $10.69\%$ | $0.7790$ / $9.97\%$ | **$0.7676$** | **$9.84\%$** |
+| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps ($dt$) | **$0.9832$** / **$2.53\%$** | **$0.9450$** / **$5.31\%$** | **$0.9464$** / **$5.05\%$** | **$0.9582$** | **$4.30\%$** |
+| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift ($dt$) + 5 Static Geology Maps | **$0.9697$** / **$3.34\%$** | **$0.9416$** / **$5.37\%$** | **$0.9538$** / **$4.66\%$** | **$0.9550$** | **$4.46\%$** |
 
 ---
 
-## 4. Run & Debug via VS Code (`.vscode/launch.json`)
+## 4. Visualizations & Comparative Analysis
+
+### A. Parity Correlation ($R$) & Normalized RMSE Metrics Across Configurations
+Comparison of Out-of-Fold parity correlation ($R$) and Normalized RMSE (%) across all 4 configurations for the Epistemic model:
+
+![Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_epistemic.png)
+
+---
+
+### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
+Spatial predictions for $\Delta V_P$ (top row), $\Delta S_w$ (middle row), and $\Delta \rho$ (bottom row) compared against Ground Truth across all 37,935 blind field traces:
+
+![All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_epistemic_all_properties.png)
+
+---
+
+### C. Water Saturation Change ($\Delta S_w$) & Epistemic Uncertainty ($\sigma$)
+Comparison of $\Delta S_w$ sweep front tracking and associated predictive uncertainty ($\sigma$):
+
+![Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dsw.png)
+
+---
+
+### D. Compressional Velocity Change ($\Delta V_P$) & Epistemic Uncertainty ($\sigma$)
+Comparison of $\Delta V_P$ (m/s) predictions across configurations:
+
+![Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dvp.png)
+
+---
+
+### E. Bulk Density Change ($\Delta \rho$) & Epistemic Uncertainty ($\sigma$)
+Comparison of $\Delta \rho$ (bulk rock/fluid density change) predictions across configurations:
+
+![Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
+
+---
+
+## 5. Geophysical Interpretation of Results
+
+1. **Why Pure Amplitudes (Configs 1 & 2) Plateau at $R \approx 0.75 - 0.78$:**
+   * In multi-angle seismic amplitudes, water saturation increase ($\Delta S_w > 0$) causes an acoustic impedance hardening, while pore pressure increase ($\Delta P > 0$) causes acoustic softening.
+   * Without traveltime information, amplitude-only inversion encounters cross-talk between pressure and saturation.
+2. **Why 4D Time-Shift ($dt$) Propels Performance to $R > 0.98$:**
+   * 4D traveltime shifts ($dt$) directly integrate reservoir velocity changes and dilational strain throughout the overburden and reservoir layer.
+   * This decoupled kinematic signature enables the Res-BNN to map $\Delta V_P$ with **$2.53\%$ NRMSE** and $\Delta S_w, \Delta \rho$ with **$< 5.3\%$ NRMSE**.
+3. **Role of Predictive Uncertainty ($\sigma$):**
+   * Uncertainty maps $\sigma(x)$ consistently peak along complex fault boundaries, channel edges, and inter-well regions farthest from the 26 calibration wells.
+
+---
+
+## 6. Run & Debug via VS Code (`.vscode/launch.json`)
 
 The [`.vscode/launch.json`](.vscode/launch.json) file includes preconfigured tasks for the **Run & Debug (F5)** panel:
 
-### Batch Ablation Execution + Comparative Plots:
-* **`0. [RUN-ALL] Run All 4 Ablations + Generate Comparison Plots (Aleatoric + Epistemic)`**
+* **`0. [RUN-ALL] Run All 4 Ablations + Comparison Plots (Aleatoric + Epistemic)`**
 * **`0. [RUN-ALL] Run All 4 Ablations (Epistemic Only)`**
 * **`0. [RUN-ALL] Run All 4 Ablations (Aleatoric Only)`**
-
-### Individual Scenario Runs:
 * `1. [EXP-1] 5-Fold CV: No Static / No TS (Aleatoric)`
 * `2. [EXP-1] 5-Fold CV: No Static / No TS (Epistemic)`
 * `3. [EXP-2] 5-Fold CV: With Static / No TS (Aleatoric)`
@@ -74,7 +114,7 @@ The [`.vscode/launch.json`](.vscode/launch.json) file includes preconfigured tas
 
 ---
 
-## 5. Command-Line Interface (CLI)
+## 7. Command-Line Interface (CLI)
 
 Run via `uv run` or `python -m bnn4d.cli`:
 
@@ -115,7 +155,7 @@ uv run python -m bnn4d.cli compare-ablations \
 
 ---
 
-## 6. Unit Tests
+## 8. Unit Tests
 
 Run the full automated test suite:
 
