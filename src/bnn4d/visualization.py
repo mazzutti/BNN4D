@@ -476,47 +476,115 @@ def plot_4configs_comparison(
     if output_metrics is not None:
         _save(fig_metrics, output_metrics)
 
-    # Figure 2: Side-by-side Spatial Maps with Input/Output Headings
-    sw_idx = list(property_names).index("ΔSw") if "ΔSw" in property_names else 1
-    num_cols = len(config_labels) + 1  # Truth + each config
-    fig_maps, axes_maps = plt.subplots(2, num_cols, figsize=(4.0 * num_cols, 8.2), squeeze=False, constrained_layout=True)
-
     t_eval = truth[-1] if truth.ndim == 4 else truth
-    t_sw = np.where(mask, t_eval[..., sw_idx], np.nan) if mask is not None else t_eval[..., sw_idx]
-    v_max = float(np.nanpercentile(np.abs(t_sw), 99)) if np.any(np.isfinite(t_sw)) else 0.35
+    num_cols = len(config_labels) + 1  # Truth + each config
+    generated_map_figs = {}
 
-    # Column 0: Ground Truth
-    im_gt = axes_maps[0, 0].imshow(t_sw, cmap=EAGE_CMAP, vmin=-0.2, vmax=0.8, origin="lower")
-    axes_maps[0, 0].set_title("GROUND TRUTH\nAlvo Real: ΔSw", fontsize=10, fontweight="bold", pad=8)
-    axes_maps[0, 0].set_ylabel("SAÍDA 1:\nPredição (ΔSw)", fontsize=10, fontweight="bold")
-    fig_maps.colorbar(im_gt, ax=axes_maps[0, 0], shrink=0.75)
-    axes_maps[1, 0].axis("off")
-    axes_maps[1, 0].text(0.5, 0.5, "Ground Truth\nReferência Real\n(26 Poços Treino\n37.935 Validação)", ha="center", va="center", fontsize=10, fontweight="bold", transform=axes_maps[1, 0].transAxes, bbox=dict(boxstyle="round", facecolor="#e9ecef", edgecolor="#adb5bd"))
+    # Generate individual map comparison figures for ALL predicted properties
+    for prop_idx, prop_name in enumerate(property_names):
+        fig_prop, axes_prop = plt.subplots(2, num_cols, figsize=(4.0 * num_cols, 8.2), squeeze=False, constrained_layout=True)
+        t_prop = np.where(mask, t_eval[..., prop_idx], np.nan) if mask is not None else t_eval[..., prop_idx]
 
-    for c_idx, label in enumerate(config_labels, start=1):
-        in_desc = input_specs.get(label, f"Entrada: {label}")
-        if label in loaded_preds:
-            p_map = loaded_preds[label][..., sw_idx]
-            u_map = loaded_uncs[label][..., sw_idx]
-            p_disp = np.where(mask, p_map, np.nan) if mask is not None else p_map
-            u_disp = np.where(mask, u_map, np.nan) if mask is not None else u_map
-            im_p = axes_maps[0, c_idx].imshow(p_disp, cmap=EAGE_CMAP, vmin=-0.2, vmax=0.8, origin="lower")
-            axes_maps[0, c_idx].set_title(f"{label}\n{in_desc}", fontsize=8.5, fontweight="bold", pad=8)
-            fig_maps.colorbar(im_p, ax=axes_maps[0, c_idx], shrink=0.75)
+        # Choose appropriate colormap and bounds based on property physics
+        if "sw" in prop_name.lower():
+            cmap_name = EAGE_CMAP
+            p_vmin, p_vmax = -0.2, 0.8
+        else:
+            cmap_name = "viridis" if "vp" in prop_name.lower() or "p" in prop_name.lower() else "plasma"
+            finite_vals = t_prop[np.isfinite(t_prop)]
+            if len(finite_vals) > 0:
+                p_vmin = float(np.nanpercentile(finite_vals, 1))
+                p_vmax = float(np.nanpercentile(finite_vals, 99))
+            else:
+                p_vmin, p_vmax = 0.0, 1.0
 
-            u_max = float(np.nanpercentile(u_disp, 99)) if np.any(np.isfinite(u_disp)) else 0.1
-            im_u = axes_maps[1, c_idx].imshow(u_disp, cmap="magma", vmin=0, vmax=max(u_max, 1e-4), origin="lower")
-            axes_maps[1, c_idx].set_title(f"Incerteza Preditiva (σ):\n{label}", fontsize=8.5, fontweight="bold", pad=6)
-            fig_maps.colorbar(im_u, ax=axes_maps[1, c_idx], shrink=0.75)
+        # Column 0: Ground Truth
+        im_gt = axes_prop[0, 0].imshow(t_prop, cmap=cmap_name, vmin=p_vmin, vmax=p_vmax, origin="lower")
+        axes_prop[0, 0].set_title(f"GROUND TRUTH\nAlvo Real: {prop_name}", fontsize=10, fontweight="bold", pad=8)
+        axes_prop[0, 0].set_ylabel(f"SAÍDA 1:\nPredição ({prop_name})", fontsize=10, fontweight="bold")
+        fig_prop.colorbar(im_gt, ax=axes_prop[0, 0], shrink=0.75)
+        axes_prop[1, 0].axis("off")
+        axes_prop[1, 0].text(
+            0.5, 0.5,
+            f"Ground Truth: {prop_name}\nReferência Real\n(26 Poços Treino\n37.935 Validação)",
+            ha="center", va="center", fontsize=9.5, fontweight="bold",
+            transform=axes_prop[1, 0].transAxes,
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#e9ecef", edgecolor="#adb5bd")
+        )
 
-    axes_maps[1, 1].set_ylabel("SAÍDA 2:\nIncerteza (σ)", fontsize=10, fontweight="bold")
+        for c_idx, label in enumerate(config_labels, start=1):
+            in_desc = input_specs.get(label, f"Entrada: {label}")
+            if label in loaded_preds:
+                p_map = loaded_preds[label][..., prop_idx]
+                u_map = loaded_uncs[label][..., prop_idx]
+                p_disp = np.where(mask, p_map, np.nan) if mask is not None else p_map
+                u_disp = np.where(mask, u_map, np.nan) if mask is not None else u_map
+                im_p = axes_prop[0, c_idx].imshow(p_disp, cmap=cmap_name, vmin=p_vmin, vmax=p_vmax, origin="lower")
+                axes_prop[0, c_idx].set_title(f"{label}\n{in_desc}", fontsize=8.2, fontweight="bold", pad=8)
+                fig_prop.colorbar(im_p, ax=axes_prop[0, c_idx], shrink=0.75)
 
-    for ax_row in axes_maps:
-        for ax in ax_row:
+                u_finite = u_disp[np.isfinite(u_disp)]
+                u_max = float(np.nanpercentile(u_finite, 99)) if len(u_finite) > 0 else 0.1
+                im_u = axes_prop[1, c_idx].imshow(u_disp, cmap="magma", vmin=0, vmax=max(u_max, 1e-4), origin="lower")
+                axes_prop[1, c_idx].set_title(f"Incerteza Preditiva (σ):\n{label}", fontsize=8.2, fontweight="bold", pad=6)
+                fig_prop.colorbar(im_u, ax=axes_prop[1, c_idx], shrink=0.75)
+
+        axes_prop[1, 1].set_ylabel(f"SAÍDA 2:\nIncerteza σ({prop_name})", fontsize=10, fontweight="bold")
+
+        for ax_row in axes_prop:
+            for ax in ax_row:
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+        clean_slug = prop_name.lower().replace("δ", "d").replace("Δ", "d").replace("/", "_").replace(" ", "_")
+        generated_map_figs[clean_slug] = fig_prop
+
+        if output_maps is not None:
+            out_p = Path(output_maps)
+            stem = out_p.stem
+            # Save dedicated file for this property
+            prop_out_path = out_p.parent / f"{stem}_{clean_slug}{out_p.suffix}"
+            _save(fig_prop, prop_out_path)
+            # If this is dSw, also save to default output_maps path
+            if clean_slug == "dsw" or prop_idx == 0:
+                _save(fig_prop, out_p)
+
+    # Figure 3: Combined Multi-Property Overview Grid (3 properties x 5 columns)
+    fig_all, axes_all = plt.subplots(len(property_names), num_cols, figsize=(3.8 * num_cols, 3.4 * len(property_names)), squeeze=False, constrained_layout=True)
+    for p_i, p_name in enumerate(property_names):
+        t_p = np.where(mask, t_eval[..., p_i], np.nan) if mask is not None else t_eval[..., p_i]
+        c_name = EAGE_CMAP if "sw" in p_name.lower() else ("viridis" if "vp" in p_name.lower() or "p" in p_name.lower() else "plasma")
+        if "sw" in p_name.lower():
+            v0, v1 = -0.2, 0.8
+        else:
+            fin = t_p[np.isfinite(t_p)]
+            v0 = float(np.nanpercentile(fin, 1)) if len(fin) > 0 else 0.0
+            v1 = float(np.nanpercentile(fin, 99)) if len(fin) > 0 else 1.0
+
+        im0 = axes_all[p_i, 0].imshow(t_p, cmap=c_name, vmin=v0, vmax=v1, origin="lower")
+        axes_all[p_i, 0].set_ylabel(f"Ground Truth & Pred:\n{p_name}", fontsize=9.5, fontweight="bold")
+        if p_i == 0:
+            axes_all[p_i, 0].set_title("GROUND TRUTH\nAlvo Real", fontsize=9.5, fontweight="bold", pad=6)
+        fig_all.colorbar(im0, ax=axes_all[p_i, 0], shrink=0.75)
+
+        for c_i, lbl in enumerate(config_labels, start=1):
+            if lbl in loaded_preds:
+                pm = loaded_preds[lbl][..., p_i]
+                p_d = np.where(mask, pm, np.nan) if mask is not None else pm
+                im_c = axes_all[p_i, c_i].imshow(p_d, cmap=c_name, vmin=v0, vmax=v1, origin="lower")
+                if p_i == 0:
+                    axes_all[p_i, c_i].set_title(f"{lbl}", fontsize=9, fontweight="bold", pad=6)
+                fig_all.colorbar(im_c, ax=axes_all[p_i, c_i], shrink=0.75)
+
+    for ax_r in axes_all:
+        for ax in ax_r:
             ax.set_xticks([])
             ax.set_yticks([])
 
     if output_maps is not None:
-        _save(fig_maps, output_maps)
+        out_p = Path(output_maps)
+        all_props_path = out_p.parent / f"{out_p.stem}_all_properties{out_p.suffix}"
+        _save(fig_all, all_props_path)
 
-    return fig_metrics, fig_maps
+    default_map_fig = generated_map_figs.get("dsw", next(iter(generated_map_figs.values()))) if generated_map_figs else fig_metrics
+    return fig_metrics, default_map_fig

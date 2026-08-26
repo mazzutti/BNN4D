@@ -737,6 +737,7 @@ def _parser() -> argparse.ArgumentParser:
     comp.add_argument("--data", required=True, type=Path, help="NPZ with truth targets and mask")
     comp.add_argument("--experiments", nargs="+", required=True, help="list of Label=Path or Paths of experiment directories")
     comp.add_argument("--output-dir", required=True, type=Path, help="output directory for comparison figures")
+    comp.add_argument("--model-name", type=str, default=None, help="optional model suffix for filenames (e.g. epistemic, aleatoric)")
     comp.set_defaults(func=compare_ablations)
 
     run_all = sub.add_parser("run-all-ablations", help="execute all 4 ablation scenarios sequentially and generate comparison plots")
@@ -858,8 +859,9 @@ def compare_ablations(args: argparse.Namespace) -> None:
         exp_dirs[label] = Path(path_str)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    out_metrics = args.output_dir / "comparison_4configs_metrics.png"
-    out_maps = args.output_dir / "comparison_4configs_maps.png"
+    suffix = f"_{args.model_name}" if getattr(args, "model_name", None) else ""
+    out_metrics = args.output_dir / f"comparison_4configs_metrics{suffix}.png"
+    out_maps = args.output_dir / f"comparison_4configs_maps{suffix}.png"
     plot_4configs_comparison(
         experiment_dirs=exp_dirs,
         truth=truth,
@@ -868,7 +870,7 @@ def compare_ablations(args: argparse.Namespace) -> None:
         output_metrics=out_metrics,
         output_maps=out_maps,
     )
-    print(f"Comparison plots generated in {args.output_dir}: {out_metrics.name}, {out_maps.name}")
+    print(f"Comparison plots generated in {args.output_dir} with suffix '{suffix}'")
 
 
 def main(argv: list[str] | None = None) -> None:
