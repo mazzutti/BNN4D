@@ -91,6 +91,8 @@ class VariationalLinear(nn.Module):
         self.weight_rho = nn.Parameter(torch.empty(out_features, in_features))
         self.bias_mu = nn.Parameter(torch.empty(out_features))
         self.bias_rho = nn.Parameter(torch.empty(out_features))
+        self.sampled_weight: Tensor | None = None
+        self.sampled_bias: Tensor | None = None
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -101,24 +103,41 @@ class VariationalLinear(nn.Module):
         nn.init.constant_(self.bias_rho, -5.0)
 
     @staticmethod
-    def _sample(mu: Tensor, rho: Tensor) -> Tensor:
-        sigma = F.softplus(rho)
-        return mu + sigma * torch.randn_like(mu)
+    def _sigma(rho: Tensor) -> Tensor:
+        return F.softplus(rho).clamp(min=1e-6, max=10.0)
+
+    def draw_sample(self) -> None:
+        """Sample fixed weights and biases for consistent evaluation across batches."""
+        sigma_w = self._sigma(self.weight_rho)
+        sigma_b = self._sigma(self.bias_rho)
+        self.sampled_weight = self.weight_mu + sigma_w * torch.randn_like(self.weight_mu)
+        self.sampled_bias = self.bias_mu + sigma_b * torch.randn_like(self.bias_mu)
+
+    def clear_sample(self) -> None:
+        """Clear cached sample to resume dynamic per-forward sampling."""
+        self.sampled_weight = None
+        self.sampled_bias = None
 
     def forward(self, x: Tensor, sample: bool = True) -> Tensor:
-        if sample:
-            weight = self._sample(self.weight_mu, self.weight_rho)
-            bias = self._sample(self.bias_mu, self.bias_rho)
-        else:
-            weight, bias = self.weight_mu, self.bias_mu
-        return F.linear(x, weight, bias)
+        if self.sampled_weight is not None and self.sampled_bias is not None:
+            return F.linear(x, self.sampled_weight, self.sampled_bias)
+
+        gamma = F.linear(x, self.weight_mu, self.bias_mu)
+        if not sample:
+            return gamma
+
+        # Local Reparameterization Trick (Kingma et al. 2015, TFP DenseVariational)
+        sigma_w2 = self._sigma(self.weight_rho).square()
+        sigma_b2 = self._sigma(self.bias_rho).square()
+        delta = torch.sqrt(F.linear(x.square(), sigma_w2, sigma_b2) + 1e-8)
+        return gamma + delta * torch.randn_like(gamma)
 
     def kl_divergence(self) -> Tensor:
         """Analytic KL(q || N(0, prior_std²)) for weights and biases."""
         prior_var = self.prior_std**2
 
         def kl(mu: Tensor, rho: Tensor) -> Tensor:
-            sigma = F.softplus(rho)
+            sigma = self._sigma(rho)
             return (torch.log(self.prior_std / sigma) + (sigma.square() + mu.square()) / (2 * prior_var) - 0.5).sum()
 
         return kl(self.weight_mu, self.weight_rho) + kl(self.bias_mu, self.bias_rho)
@@ -149,6 +168,16 @@ class EpistemicBNN(nn.Module):
         self.widths = tuple(widths)
         self.prior_std = prior_std
 
+    def draw_sample(self) -> None:
+        """Sample fixed weights for all layers across a full dataset evaluation pass."""
+        for layer in self.layers:
+            layer.draw_sample()
+
+    def clear_sample(self) -> None:
+        """Clear cached weight samples for all layers."""
+        for layer in self.layers:
+            layer.clear_sample()
+
     def forward(self, x: Tensor, sample: bool = True) -> Tensor:
         for layer in self.layers[:-1]:
             x = self.activation(layer(x, sample=sample))
@@ -162,6 +191,7 @@ class EpistemicBNN(nn.Module):
         """Monte Carlo posterior: samples, mean and epistemic std (paper: 500)."""
         if samples < 2:
             raise ValueError("samples must be at least 2 to estimate standard deviation")
+        self.clear_sample()
         draws = torch.stack([self(x, sample=True) for _ in range(samples)])
         return draws, draws.mean(dim=0), draws.std(dim=0, unbiased=True)
 

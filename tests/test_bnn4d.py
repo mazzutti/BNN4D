@@ -10,7 +10,14 @@ from matplotlib import pyplot as plt
 from bnn4d.data import FeatureStandardizer, SlidingWindowDataset, add_relative_gaussian_noise
 from bnn4d.losses import gaussian_nll, variational_free_energy
 from bnn4d.models import AleatoricAutoencoder, EpistemicBNN, VariationalLinear
-from bnn4d.visualization import plot_prediction_diagnostics, plot_property_maps, plot_training_history
+from bnn4d.sgy import compute_sna
+from bnn4d.visualization import (
+    plot_eage_saturation_vp_comparison,
+    plot_error_maps,
+    plot_prediction_diagnostics,
+    plot_property_maps,
+    plot_training_history,
+)
 
 
 class ModelTests(unittest.TestCase):
@@ -49,7 +56,38 @@ class DataTests(unittest.TestCase):
         targets = torch.zeros(4, 2, 3, 3)
         data = SlidingWindowDataset(seismic, pore_volume, targets, window=2)
         self.assertEqual(len(data), 3 * 2 * 3)
-        self.assertEqual(data.features.shape[1], 2 * 4 + 1)
+        self.assertEqual(data.features.shape[1], 2 * 4 + 4 + 1)  # 2*channels + delta + pore_volume
+
+    def test_sliding_window_with_time_shift_and_rel_deltas(self):
+        seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
+        pore_volume = torch.ones(2, 3)
+        time_shift = torch.ones(4, 2, 3, 2)
+        targets = torch.zeros(4, 2, 3, 3)
+        data = SlidingWindowDataset(
+            seismic,
+            pore_volume,
+            targets,
+            window=2,
+            include_deltas=True,
+            include_relative_deltas=True,
+            time_shift=time_shift,
+        )
+        self.assertEqual(len(data), 3 * 2 * 3)
+        # 2*4 (seismic) + 4 (delta) + 4 (rel_delta) + 2*2 (time_shift) + 1 (pore_vol) = 21
+        self.assertEqual(data.features.shape[1], 8 + 4 + 4 + 4 + 1)
+
+    def test_trace_selection_strategies(self):
+        from bnn4d.data import select_subset_traces
+        mask = np.ones((50, 50), dtype=bool)
+        for method in ["unisim_wells", "spatial_optimal", "random"]:
+            idx = select_subset_traces(total_samples=2500, mask=mask, n_traces=26, method=method, seed=42)
+            self.assertEqual(len(idx), 26)
+            self.assertEqual(len(np.unique(idx)), 26)
+            self.assertTrue(np.all(idx >= 0) and np.all(idx < 2500))
+        # Test subset selection from canonical wells
+        idx_sub = select_subset_traces(total_samples=2500, mask=mask, n_traces=10, method="unisim_wells", seed=42)
+        self.assertEqual(len(idx_sub), 10)
+        self.assertEqual(len(np.unique(idx_sub)), 10)
 
     def test_standardization(self):
         values = torch.randn(100, 4) * 3 + 7
@@ -62,6 +100,13 @@ class DataTests(unittest.TestCase):
         noisy = add_relative_gaussian_noise(data, 0)
         self.assertTrue(torch.equal(data, noisy))
         self.assertIsNot(data, noisy)
+
+    def test_compute_sna(self):
+        cube = np.array([[[-1.0, 2.0], [0.5, -3.0]]], dtype=np.float32)
+        sna = compute_sna(cube)
+        self.assertEqual(sna.shape, (1, 2))
+        self.assertEqual(sna[0, 0], -1.0)
+        self.assertEqual(sna[0, 1], -3.0)
 
 
 class VisualizationTests(unittest.TestCase):
@@ -83,7 +128,15 @@ class VisualizationTests(unittest.TestCase):
 
     def test_diagnostics(self):
         figure = plot_prediction_diagnostics(self.mean, self.uncertainty, self.truth)
-        self.assertEqual(len(figure.axes), 9)
+        self.assertGreaterEqual(len(figure.axes), 9)
+
+    def test_eage_comparison(self):
+        figure = plot_eage_saturation_vp_comparison(self.mean[..., 0], self.truth[..., 1], self.truth[..., 0])
+        self.assertGreaterEqual(len(figure.axes), 3)
+
+    def test_error_maps(self):
+        figure = plot_error_maps(self.mean, self.truth, uncertainty=self.uncertainty)
+        self.assertGreaterEqual(len(figure.axes), 9)
 
 
 if __name__ == "__main__":

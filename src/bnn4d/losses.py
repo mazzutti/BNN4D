@@ -26,8 +26,9 @@ def variational_free_energy(
     kl_divergence: Tensor,
     training_size: int,
     observation_std: float = 1.0,
+    kl_scale: float | None = None,
 ) -> tuple[Tensor, Tensor, Tensor]:
-    """One-sample Monte Carlo ELBO: Gaussian data fit + KL/N (Eq. 5).
+    """One-sample Monte Carlo ELBO: Gaussian data fit + scaled KL complexity (Eq. 5).
 
     Returns total, data-fit and scaled complexity terms for transparent logging.
     """
@@ -35,6 +36,7 @@ def variational_free_energy(
         raise ValueError("training_size and observation_std must be positive")
     variance = observation_std**2
     data_fit = (0.5 * (math.log(2 * math.pi * variance) + (target - prediction).square() / variance)).mean()
-    complexity = kl_divergence / training_size
+    beta = kl_scale if kl_scale is not None else (1.0 / max(training_size, 10000))
+    complexity = kl_divergence * beta
     return data_fit + complexity, data_fit, complexity
 

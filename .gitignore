@@ -1,3 +1,17 @@
 .matplotlib
+data/
+.venv
+.DS_Store
+**/.DS_Store
+*.pyc
+*.pyo
+uv.lock
 __pycache__
 **/__pycache__
+*.pdf
+*.egg-info/
+artifacts/*.pt
+artifacts/*.npz
+artifacts/cv_*
+artifacts/exp*
+artifacts/ablation_study/
