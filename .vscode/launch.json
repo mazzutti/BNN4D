@@ -177,6 +177,7 @@
         "MPLCONFIGDIR": "${workspaceFolder}/.matplotlib"
       },
       "console": "integratedTerminal"
+    },
     {
       "name": "2. [EXP-1] 5-Fold CV: No Static / No TS (Epistemic)",
       "type": "debugpy",
