@@ -48,20 +48,85 @@ The 5 ablation configurations evaluate the incremental impact of scalar amplitud
 | **Config 4: Scalar Slices / With TS** | **36** | 32 Summary Amplitudes + 4 Seismic 4D Time-Shift Maps (`τ_strain`, `Δdt/dt`) | **0.9862** / **2.28%** | **0.9429** / **5.36%** | **0.9442** / **5.11%** | **0.9578** | **4.25%** |
 | **Config 5: Scalar + Temporal 1D / With TS** | **40** | 32 Summary Amplitudes + 4 Waveform Difference Modes + 4 Seismic 4D Time-Shift Maps | **0.9715** / **3.24%** | **0.9406** / **5.46%** | **0.9420** / **5.22%** | **0.9514** | **4.64%** |
 
-### 3.1 Input Feature Specifications & 5-Scenario Matrix
+### 3.1 Model Inputs & Target Outputs Specification for Each Configuration
 
-The benchmark evaluates **5 distinct seismic representation configurations** across all 5 folds:
+```
+                ┌─────────────────────────────────────────────────────────┐
+                │                  SEISMIC INPUT FEATURES                 │
+                └───────────────────────────┬─────────────────────────────┘
+                                            │
+               ┌────────────────────────────┼────────────────────────────┐
+               ▼                            ▼                            ▼
+      [32 Scalar Slices]          [4 1D Waveform Modes]       [4 Seismic Time-Shifts]
+      • Base (8 ch)               • Orthogonal SVD            • τ_strain = ln(Vp24/Vp13)
+      • Monitor (8 ch)              Modes m1..m4 of           • Δdt/dt = ΔVp/Vp24
+      • ΔA (8 ch)                   ΔW(t, θ) snippet
+      • Rel ΔA/A (8 ch)
+               │                            │                            │
+               ├───────────────────┬────────┴───────────┬────────────────┤
+               │ Config 1: 32 ch   │ Config 2: 4 ch     │ Config 3: 36 ch│
+               │ (Scalar / No TS)  │ (1D Only / No TS)  │ (Scal+1D/No TS)│
+               │                   │                    │                │
+               │ Config 4: 36 ch   │                    │ Config 5: 40 ch│
+               │ (Scalar / With TS)│                    │ (All Features) │
+               └───────────────────┴────────┬───────────┴────────────────┘
+                                            │
+                                            ▼
+                              ┌───────────────────────────┐
+                              │    BNN4D INVERSION CORE   │
+                              │  (Epistemic / Aleatoric)  │
+                              └─────────────┬─────────────┘
+                                            │
+                                            ▼
+                ┌─────────────────────────────────────────────────────────┐
+                │                     TARGET OUTPUTS                      │
+                ├─────────────────────────────────────────────────────────┤
+                │  1. ΔVP: P-Wave Velocity Change (m/s)                   │
+                │  2. ΔSw: Water Saturation Change (fractional [0, 1])    │
+                │  3. Δρ:  Bulk Density Change (g/cm³)                    │
+                │  4. σ:   Predictive Uncertainty (Epistemic / Aleatoric) │
+                └─────────────────────────────────────────────────────────┘
+```
 
-1. **Config 1 (`exp1_scalar_no_ts`, 32 features): Scalar Slices / No TS**
-   * Vertically integrated Summary Amplitudes (Base 8 + Monitor 8 + ΔA 8 + Rel ΔA/A 8 across 10°, 20°, 30°, 40°).
-2. **Config 2 (`exp2_temporal_only_no_ts`, 4 features): Temporal Window 1D Only / No TS**
-   * Top 4 Principal Orthogonal 1D Waveform Difference Modes (`ΔW(t, θ)`) extracted via SVD across multi-offset trace snippets centered at the reservoir midpoint.
-3. **Config 3 (`exp3_scalar_temporal_no_ts`, 36 features): Scalar + Temporal 1D / No TS**
-   * Combined 32 Summary Amplitudes + 4 Principal 1D Waveform Modes.
-4. **Config 4 (`exp4_scalar_with_ts`, 36 features): Scalar Slices / With TS**
-   * 32 Summary Amplitudes + 4 Seismic 4D Time-Shift Maps (`τ_strain`, `Δdt/dt`).
-5. **Config 5 (`exp5_scalar_temporal_with_ts`, 40 features): Scalar + Temporal 1D / With TS**
-   * 32 Summary Amplitudes + 4 Principal 1D Waveform Modes + 4 Seismic 4D Time-Shift Maps.
+#### A. Target Outputs (Shared across all 5 Configurations)
+Every network model takes a surface trace location `(x, y)` and predicts **3 physical property changes** plus **predictive uncertainty**:
+1. **`ΔVP` (Compressional Velocity Change, $m/s$):** $\Delta V_P = V_{P,2024} - V_{P,2013}$. Maps pressure depletion (softening) and water influx (hardening) dynamics across the reservoir.
+2. **`ΔSw` (Water Saturation Change, fractional $[0, 1]$):** $\Delta S_w = S_{w,2024} - S_{w,2013}$. Delineates the advance of the injected water front from injector wells into production drainage areas.
+3. **`Δρ` (Bulk Density Change, $g/cm^3$):** $\Delta \rho = \rho_{2024} - \rho_{2013}$. Quantifies fluid substitution effects during water-oil displacement.
+4. **Predictive Uncertainty ($\sigma$):**
+   * **Epistemic Model (`EpistemicBNN` / Res-BNN):** Computes $\sigma_{\text{epistemic}}$ via $S = 100$ Monte Carlo variational forward passes on posterior weights $w \sim q(w)$, revealing model ambiguity in poorly sampled compartments.
+   * **Aleatoric Model (`AleatoricAutoencoder`):** Direct heteroscedastic standard deviation $\sigma_{\text{aleatoric}}(x)$ from the variance output head, capturing seismic noise and data imperfections.
+
+---
+
+#### B. Input Feature Breakdown for Each Configuration
+
+| Configuration | Total Features | 1. Baseline Summary (2013) | 2. Monitor Summary (2024) | 3. Explicit 4D $\Delta A$ | 4. Relative 4D $\Delta A/A$ | 5. 1D Waveform Modes | 6. 4D Time-Shift ($dt$) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Config 1 (`exp1_scalar_no_ts`)** | **32** | 8 channels | 8 channels | 8 channels | 8 channels | — | — |
+| **Config 2 (`exp2_temporal_only_no_ts`)** | **4** | — | — | — | — | 4 channels | — |
+| **Config 3 (`exp3_scalar_temporal_no_ts`)** | **36** | 8 channels | 8 channels | 8 channels | 8 channels | 4 channels | — |
+| **Config 4 (`exp4_scalar_with_ts`)** | **36** | 8 channels | 8 channels | 8 channels | 8 channels | — | 4 channels |
+| **Config 5 (`exp5_scalar_temporal_with_ts`)** | **40** | 8 channels | 8 channels | 8 channels | 8 channels | 4 channels | 4 channels |
+
+##### Detailed Channel Descriptions:
+1. **Baseline Summary Amplitudes (2013, 8 channels):**
+   * 4 × SNA (*Sum of Negative Amplitudes*): `A_13(10°)`, `A_13(20°)`, `A_13(30°)`, `A_13(40°)`
+   * 4 × RMS (*Root Mean Square Energy*): `RMS_13(10°)`, `RMS_13(20°)`, `RMS_13(30°)`, `RMS_13(40°)`
+2. **Monitor Summary Amplitudes (2024, 8 channels):**
+   * 4 × SNA: `A_24(10°)`, `A_24(20°)`, `A_24(30°)`, `A_24(40°)`
+   * 4 × RMS: `RMS_24(10°)`, `RMS_24(20°)`, `RMS_24(30°)`, `RMS_24(40°)`
+3. **Explicit 4D Differential Amplitudes (8 channels):**
+   * 4 × `ΔSNA = A_24(θ) - A_13(θ)` across 10°, 20°, 30°, 40°
+   * 4 × `ΔRMS = RMS_24(θ) - RMS_13(θ)` across 10°, 20°, 30°, 40°
+4. **Normalized Relative 4D Differential Amplitudes (8 channels):**
+   * 4 × Rel `ΔSNA = (A_24 - A_13) / (|A_13| + 1e-4)` across 10°, 20°, 30°, 40°
+   * 4 × Rel `ΔRMS = (RMS_24 - RMS_13) / (|RMS_13| + 1e-4)` across 10°, 20°, 30°, 40°
+5. **1D Temporal Waveform Modes (4 channels):**
+   * Principal orthogonal projection modes $m_1, m_2, m_3, m_4$ obtained via SVD decomposition on the multi-angle 11-sample waveform difference snippet $\Delta W(t, \theta)$ centered at the reservoir midpoint.
+6. **Seismic 4D Time-Shift ($dt$) Maps (4 channels):**
+   * 2 × Integrated 4D Traveltime Dilational Strain: `τ_strain = ln(Vp_2024 / Vp_2013)`
+   * 2 × Fractional Traveltime Velocity Delay: `Δdt / dt = (Vp_2024 - Vp_2013) / Vp_2024`
 
 ---
 
