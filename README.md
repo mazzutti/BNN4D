@@ -50,24 +50,24 @@ The 4 ablation configurations evaluate the incremental impact of scalar amplitud
 ### 3.1 Input Feature Specifications
 
 #### A. Scalar Slices Models (`*_scalar_*` files)
-For every surface trace coordinate $(x, y)$, the vertical reservoir interval is vertically integrated into scalar summary amplitudes across the 4 angle stacks ($\theta \in [10^\circ, 20^\circ, 30^\circ, 40^\circ]$):
-1. **Baseline Summary Amplitudes ($t_1 = 2013$, 8 channels):**
-   * **4 $\times$ SNA (Sum of Negative Amplitudes):** $A_{13}^{10^\circ}, A_{13}^{20^\circ}, A_{13}^{30^\circ}, A_{13}^{40^\circ}$
-   * **4 $\times$ RMS Amplitudes:** $\text{RMS}_{13}^{10^\circ}, \text{RMS}_{13}^{20^\circ}, \text{RMS}_{13}^{30^\circ}, \text{RMS}_{13}^{40^\circ}$
-2. **Monitor Summary Amplitudes ($t_2 = 2024$, 8 channels):**
-   * **4 $\times$ SNA:** $A_{24}^{10^\circ}, A_{24}^{20^\circ}, A_{24}^{30^\circ}, A_{24}^{40^\circ}$
-   * **4 $\times$ RMS Amplitudes:** $\text{RMS}_{24}^{10^\circ}, \text{RMS}_{24}^{20^\circ}, \text{RMS}_{24}^{30^\circ}, \text{RMS}_{24}^{40^\circ}$
-3. **Explicit 4D Differential Amplitudes ($\Delta A = A_{2024} - A_{2013}$, 8 channels):**
-   * 4 $\times$ $\Delta \text{SNA}$ and 4 $\times$ $\Delta \text{RMS}$ across $10^\circ, 20^\circ, 30^\circ, 40^\circ$
-4. **Normalized Relative 4D Differential Amplitudes ($\frac{\Delta A}{|A_{\text{base}}| + 10^{-4}}$, 8 channels):**
-   * 4 $\times$ Rel $\Delta \text{SNA}$ and 4 $\times$ Rel $\Delta \text{RMS}$ across $10^\circ, 20^\circ, 30^\circ, 40^\circ$
+For every surface trace coordinate `(x, y)`, the vertical reservoir interval is vertically integrated into scalar summary amplitudes across the 4 angle stacks (10°, 20°, 30°, 40°):
+1. **Baseline Summary Amplitudes (2013, 8 channels):**
+   * **4 × SNA (Sum of Negative Amplitudes):** `A_13(10°)`, `A_13(20°)`, `A_13(30°)`, `A_13(40°)`
+   * **4 × RMS Amplitudes:** `RMS_13(10°)`, `RMS_13(20°)`, `RMS_13(30°)`, `RMS_13(40°)`
+2. **Monitor Summary Amplitudes (2024, 8 channels):**
+   * **4 × SNA:** `A_24(10°)`, `A_24(20°)`, `A_24(30°)`, `A_24(40°)`
+   * **4 × RMS Amplitudes:** `RMS_24(10°)`, `RMS_24(20°)`, `RMS_24(30°)`, `RMS_24(40°)`
+3. **Explicit 4D Differential Amplitudes (`ΔA = A_2024 - A_2013`, 8 channels):**
+   * 4 × `ΔSNA` and 4 × `ΔRMS` across 10°, 20°, 30°, 40°
+4. **Normalized Relative 4D Differential Amplitudes (`ΔA / (|A_base| + 1e-4)`, 8 channels):**
+   * 4 × Rel `ΔSNA` and 4 × Rel `ΔRMS` across 10°, 20°, 30°, 40°
 5. **Seismic 4D Time-Shift Maps (Config 3 `*_scalar_with_ts_*`, +4 channels):**
-   * $\tau_{\text{strain}} = \ln\left(\frac{V_{P,2024}}{V_{P,2013}}\right)$ (integrated 4D traveltime delay)
-   * $\frac{\Delta dt}{dt} = \frac{V_{P,2024} - V_{P,2013}}{V_{P,2024}}$
+   * `τ_strain = ln(Vp_2024 / Vp_2013)` (integrated 4D traveltime delay)
+   * `Δdt / dt = (Vp_2024 - Vp_2013) / Vp_2024`
 
 #### B. 1D Temporal Window Models (`*_temporal_*` files)
 * Includes all **32 Summary Amplitude Features** above.
-* Appends **4 Principal Orthogonal 1D Waveform Modes** extracted via Singular Value Decomposition (SVD/PCA) on the multi-sample depth waveform difference $\Delta W(t, \theta)$ centered at the reservoir midpoint.
+* Appends **4 Principal Orthogonal 1D Waveform Modes** extracted via Singular Value Decomposition (SVD/PCA) on the multi-sample depth waveform difference `ΔW(t, θ)` centered at the reservoir midpoint.
 * When Time-Shift is active (Config 4 `*_temporal_with_ts_*`), appends the **4 Time-Shift (dt)** channels (Total = 40 features).
 
 ---
