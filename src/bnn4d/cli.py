@@ -76,6 +76,7 @@ def train(args: argparse.Namespace) -> None:
     use_time_shift = getattr(args, "use_time_shift", False)
     temporal_window = getattr(args, "temporal_window", False)
     relative_deltas = getattr(args, "relative_deltas", True)
+    include_scalar = not getattr(args, "no_scalar", False)
     temporal_window_data = arrays.get("temporal_window") if temporal_window else None
     time_shift = arrays.get("time_shift") if use_time_shift else None
     dataset = SlidingWindowDataset(
@@ -86,6 +87,7 @@ def train(args: argparse.Namespace) -> None:
         mask=mask,
         include_deltas=True,
         include_relative_deltas=relative_deltas,
+        include_scalar=include_scalar,
         time_shift=time_shift,
     )
 
@@ -225,6 +227,7 @@ def cross_validate(args: argparse.Namespace) -> None:
     use_time_shift = getattr(args, "use_time_shift", False)
     temporal_window = getattr(args, "temporal_window", False)
     relative_deltas = getattr(args, "relative_deltas", True)
+    include_scalar = not getattr(args, "no_scalar", False)
     temporal_window_data = arrays.get("temporal_window") if temporal_window else None
     time_shift = arrays.get("time_shift") if use_time_shift else None
     dataset = SlidingWindowDataset(
@@ -235,6 +238,7 @@ def cross_validate(args: argparse.Namespace) -> None:
         mask=mask,
         include_deltas=True,
         include_relative_deltas=relative_deltas,
+        include_scalar=include_scalar,
         time_shift=time_shift,
     )
 
@@ -653,6 +657,7 @@ def _parser() -> argparse.ArgumentParser:
     fit.add_argument("--trace-selection", choices=("unisim_wells", "spatial_optimal", "random"), default="unisim_wells", help="trace selection method (default: unisim_wells)")
     fit.add_argument("--use-time-shift", action="store_true", default=False, help="include 4D time-shift in features (default: False)")
     fit.add_argument("--temporal-window", action="store_true", default=False, help="include 1D temporal waveform window features (default: False)")
+    fit.add_argument("--no-scalar", action="store_true", default=False, help="exclude scalar summary attributes (default: False)")
     fit.add_argument("--noise", type=float, default=0.17, help="relative noise fraction (paper optimum: 0.17)")
     fit.add_argument("--epochs", type=int, default=400)
     fit.add_argument("--batch-size", type=int, default=256)
@@ -679,6 +684,7 @@ def _parser() -> argparse.ArgumentParser:
     cv_p.add_argument("--window", type=int, default=2)
     cv_p.add_argument("--use-time-shift", action="store_true", default=False, help="include 4D time-shift in features (default: False)")
     cv_p.add_argument("--temporal-window", action="store_true", default=False, help="include 1D temporal waveform window features (default: False)")
+    cv_p.add_argument("--no-scalar", action="store_true", default=False, help="exclude scalar summary attributes (default: False)")
     cv_p.add_argument("--noise", type=float, default=0.0)
     cv_p.add_argument("--epochs", type=int, default=200)
     cv_p.add_argument("--patience", type=int, default=10)
@@ -699,6 +705,7 @@ def _parser() -> argparse.ArgumentParser:
     infer.add_argument("--output", required=True, type=Path)
     infer.add_argument("--use-time-shift", action="store_true", default=False, help="force include 4D time-shift in features")
     infer.add_argument("--temporal-window", action="store_true", default=False, help="force include 1D temporal waveform window features")
+    infer.add_argument("--no-scalar", action="store_true", default=False, help="exclude scalar summary attributes")
     infer.add_argument("--samples", type=int, default=500, help="epistemic Monte Carlo passes")
     infer.add_argument("--batch-size", type=int, default=4096)
     infer.add_argument("--device", default="auto")
@@ -715,17 +722,17 @@ def _parser() -> argparse.ArgumentParser:
     plots.add_argument("--log-y", action="store_true", help="use logarithmic loss axis")
     plots.set_defaults(func=plot_results)
 
-    comp = sub.add_parser("compare-ablations", help="compare the 4 ablation experiments (metrics and maps)")
+    comp = sub.add_parser("compare-ablations", help="compare ablation experiments (metrics and maps)")
     comp.add_argument("--data", required=True, type=Path, help="NPZ with truth targets and mask")
     comp.add_argument("--experiments", nargs="+", required=True, help="list of Label=Path or Paths of experiment directories")
     comp.add_argument("--output-dir", required=True, type=Path, help="output directory for comparison figures")
     comp.add_argument("--model-name", type=str, default=None, help="optional model suffix for filenames (e.g. epistemic, aleatoric)")
     comp.set_defaults(func=compare_ablations)
 
-    run_all = sub.add_parser("run-all-ablations", help="execute all 4 ablation scenarios sequentially and generate comparison plots")
+    run_all = sub.add_parser("run-all-ablations", help="execute all 5 ablation scenarios sequentially and generate comparison plots")
     run_all.add_argument("--data", required=True, type=Path, help="NPZ dataset path")
     run_all.add_argument("--output-dir", type=Path, default=Path("artifacts/ablation_study"), help="base output directory")
-    run_all.add_argument("--model", choices=("all", "aleatoric", "epistemic"), default="all", help="which model to run across 4 scenarios")
+    run_all.add_argument("--model", choices=("all", "aleatoric", "epistemic"), default="all", help="which model to run across scenarios")
     run_all.add_argument("--train-traces", type=int, default=26)
     run_all.add_argument("--trace-selection", choices=("unisim_wells", "spatial_optimal", "random"), default="unisim_wells")
     run_all.add_argument("--activation", choices=("relu", "elu", "gelu", "tanh"), default="gelu")
@@ -751,19 +758,20 @@ def run_all_ablations(args: argparse.Namespace) -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     scenarios = [
-        ("exp1_scalar_no_ts", "1. Scalar Slices / No TS", False, False),
-        ("exp2_temporal_no_ts", "2. Temporal Window 1D / No TS", True, False),
-        ("exp3_scalar_with_ts", "3. Scalar Slices / With TS", False, True),
-        ("exp4_temporal_with_ts", "4. Temporal Window 1D / With TS", True, True),
+        ("exp1_scalar_no_ts", "1. Scalar Slices / No TS", False, True, False),
+        ("exp2_temporal_only_no_ts", "2. Temporal Window 1D Only / No TS", True, False, False),
+        ("exp3_scalar_temporal_no_ts", "3. Scalar + Temporal 1D / No TS", True, True, False),
+        ("exp4_scalar_with_ts", "4. Scalar Slices / With TS", False, True, True),
+        ("exp5_scalar_temporal_with_ts", "5. Scalar + Temporal 1D / With TS", True, True, True),
     ]
 
     for model_type in models_to_run:
         print(f"\n=======================================================")
-        print(f"  RUNNING ALL 4 ABLATION SCENARIOS FOR MODEL: {model_type.upper()}")
+        print(f"  RUNNING ALL 5 ABLATION SCENARIOS FOR MODEL: {model_type.upper()}")
         print(f"=======================================================\n")
 
         exp_mapping: dict[str, Path] = {}
-        for folder_prefix, label, temporal_window, use_time_shift in scenarios:
+        for folder_prefix, label, temporal_window, include_scalar, use_time_shift in scenarios:
             exp_out = args.output_dir / f"{folder_prefix}_{model_type}"
             exp_mapping[label] = exp_out
 
@@ -779,6 +787,7 @@ def run_all_ablations(args: argparse.Namespace) -> None:
                 train_traces=args.train_traces,
                 trace_selection=args.trace_selection,
                 temporal_window=temporal_window,
+                no_scalar=not include_scalar,
                 use_time_shift=use_time_shift,
                 relative_deltas=True,
                 activation=args.activation,
@@ -800,17 +809,17 @@ def run_all_ablations(args: argparse.Namespace) -> None:
             cross_validate(cv_args)
 
         # Generate comparative plots for this model type
-        print(f"\n>>> Generating Comparative Plots for {model_type.upper()} across all 4 scenarios >>>")
+        print(f"\n>>> Generating Comparative Plots for {model_type.upper()} across all 5 scenarios >>>")
         import matplotlib
         matplotlib.use("Agg")
         from .visualization import plot_4configs_comparison
         arrays = _load_npz(args.data, require_targets=True)
         truth = arrays["targets"]
         mask = arrays.get("mask")
-        prop_names = list(arrays.get("property_names", ["ΔP", "ΔSw", "ΔSg"]))
+        prop_names = list(arrays.get("property_names", ["ΔVP", "ΔSw", "Δρ"]))
 
-        out_metrics = args.output_dir / f"comparison_4configs_metrics_{model_type}.png"
-        out_maps = args.output_dir / f"comparison_4configs_maps_{model_type}.png"
+        out_metrics = args.output_dir / f"comparison_5configs_metrics_{model_type}.png"
+        out_maps = args.output_dir / f"comparison_5configs_maps_{model_type}.png"
         plot_4configs_comparison(
             experiment_dirs=exp_mapping,
             truth=truth,

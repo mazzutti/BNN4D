@@ -176,6 +176,7 @@ def build_sliding_features(
     mask: Tensor | np.ndarray | None = None,
     include_deltas: bool = True,
     include_relative_deltas: bool = False,
+    include_scalar: bool = True,
     time_shift: Tensor | np.ndarray | None = None,
 ) -> Tensor:
     """Build per-cell features without requiring targets (training or field use)."""
@@ -210,18 +211,20 @@ def build_sliding_features(
     mask_flat = torch.as_tensor(mask, dtype=torch.bool).reshape(-1) if mask is not None else None
     examples = []
     for end in range(window - 1, seismic.shape[0]):
-        # Dynamic window attributes (scalar summary)
-        win_seis = seismic[end - window + 1 : end + 1]  # [W, H, W, A]
-        dynamic = win_seis.permute(1, 2, 0, 3).reshape(-1, window * seismic.shape[-1])
-        parts = [dynamic]
-        if include_deltas and window >= 2:
-            # Explicit 4D differential attributes (monitor - baseline)
-            delta = (win_seis[-1] - win_seis[0]).reshape(-1, seismic.shape[-1])
-            parts.append(delta)
-        if include_relative_deltas and window >= 2:
-            # Explicit normalized relative 4D differential: (monitor - baseline) / (|baseline| + 1e-4)
-            rel_delta = ((win_seis[-1] - win_seis[0]) / (torch.abs(win_seis[0]) + 1e-4)).reshape(-1, seismic.shape[-1])
-            parts.append(rel_delta)
+        parts = []
+        if include_scalar:
+            # Dynamic window attributes (scalar summary)
+            win_seis = seismic[end - window + 1 : end + 1]  # [W, H, W, A]
+            dynamic = win_seis.permute(1, 2, 0, 3).reshape(-1, window * seismic.shape[-1])
+            parts.append(dynamic)
+            if include_deltas and window >= 2:
+                # Explicit 4D differential attributes (monitor - baseline)
+                delta = (win_seis[-1] - win_seis[0]).reshape(-1, seismic.shape[-1])
+                parts.append(delta)
+            if include_relative_deltas and window >= 2:
+                # Explicit normalized relative 4D differential: (monitor - baseline) / (|baseline| + 1e-4)
+                rel_delta = ((win_seis[-1] - win_seis[0]) / (torch.abs(win_seis[0]) + 1e-4)).reshape(-1, seismic.shape[-1])
+                parts.append(rel_delta)
 
         # Dynamic 1D Temporal Waveform Window features (4 Principal Orthogonal Modes)
         if tw_tensor is not None:
@@ -239,6 +242,8 @@ def build_sliding_features(
             else:
                 ts_flat = ts_tensor[0].reshape(-1, ts_tensor.shape[-1])
             parts.append(ts_flat)
+        if not parts:
+            raise ValueError("no features selected: include_scalar is False and neither temporal_window nor time_shift was provided")
         cell_features = torch.cat(parts, dim=-1)
         if mask_flat is not None:
             cell_features = cell_features[mask_flat]
@@ -264,6 +269,7 @@ class SlidingWindowDataset(Dataset[tuple[Tensor, Tensor]]):
         mask: Tensor | np.ndarray | None = None,
         include_deltas: bool = True,
         include_relative_deltas: bool = False,
+        include_scalar: bool = True,
         time_shift: Tensor | np.ndarray | None = None,
     ) -> None:
         seismic = torch.as_tensor(seismic, dtype=torch.float32)
@@ -293,6 +299,7 @@ class SlidingWindowDataset(Dataset[tuple[Tensor, Tensor]]):
             mask=mask,
             include_deltas=include_deltas,
             include_relative_deltas=include_relative_deltas,
+            include_scalar=include_scalar,
             time_shift=time_shift,
         )
 

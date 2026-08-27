@@ -88,6 +88,14 @@ class DataTests(unittest.TestCase):
         self.assertEqual(len(data), 3 * 2 * 3)
         self.assertEqual(data.features.shape[1], 8 + 4 + 4 + 4 + 4)
 
+    def test_sliding_window_no_scalar(self):
+        seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
+        temporal_window = torch.ones(4, 2, 3, 4)
+        targets = torch.zeros(4, 2, 3, 3)
+        data = SlidingWindowDataset(seismic, temporal_window, targets, window=2, include_scalar=False)
+        self.assertEqual(len(data), 3 * 2 * 3)
+        self.assertEqual(data.features.shape[1], 4)
+
     def test_trace_selection_strategies(self):
         from bnn4d.data import select_subset_traces
         mask = np.ones((50, 50), dtype=bool)

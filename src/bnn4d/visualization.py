@@ -384,11 +384,12 @@ def plot_4configs_comparison(
 
     # Define input descriptions for each standard configuration
     input_specs = {
-        "1. Scalar Slices / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, ΔA/A across 8 angles)",
-        "2. Temporal Window 1D / No TS": "INPUT: 36 Features (32 Summary + 4 Principal 1D Waveform Modes)",
-        "3. Scalar Slices / With TS": "INPUT: 36 Features (32 Summary + 4 Time-Shift dt)",
-        "4. Temporal Window 1D / With TS": "INPUT: 40 Features (32 Summary + 4 Waveform Modes + 4 dt)",
-        "1. No Static / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, ΔA/A across 8 angles)",
+        "1. Scalar Slices / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, Rel ΔA across 4 angles)",
+        "2. Temporal Window 1D Only / No TS": "INPUT: 4 Features (4 Principal Orthogonal 1D Waveform Modes)",
+        "3. Scalar + Temporal 1D / No TS": "INPUT: 36 Features (32 Summary + 4 Principal 1D Waveform Modes)",
+        "4. Scalar Slices / With TS": "INPUT: 36 Features (32 Summary + 4 Seismic 4D Time-Shift Maps dt)",
+        "5. Scalar + Temporal 1D / With TS": "INPUT: 40 Features (32 Summary + 4 Waveform Modes + 4 dt)",
+        "1. No Static / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, Rel ΔA across 4 angles)",
         "2. With Static / No TS": "INPUT: 36 Features (32 Summary + 4 Principal 1D Waveform Modes)",
         "3. No Static / With TS": "INPUT: 36 Features (32 Summary + 4 Time-Shift dt)",
         "4. With Static / With TS": "INPUT: 40 Features (32 Summary + 4 Waveform Modes + 4 dt)",
@@ -426,8 +427,8 @@ def plot_4configs_comparison(
             metrics_data["NRMSE"][name].append((label, nrmse_val))
 
     # Figure 1: Comparative Bar Charts for R and NRMSE with Input/Output Annotation
-    fig_metrics = plt.figure(figsize=(15, 7.2), constrained_layout=True)
-    gs = fig_metrics.add_gridspec(2, 2, height_ratios=[1, 0.22])
+    fig_metrics = plt.figure(figsize=(15.5, 7.5), constrained_layout=True)
+    gs = fig_metrics.add_gridspec(2, 2, height_ratios=[1, 0.24])
     ax_r = fig_metrics.add_subplot(gs[0, 0])
     ax_nrmse = fig_metrics.add_subplot(gs[0, 1])
     ax_info = fig_metrics.add_subplot(gs[1, :])
@@ -436,7 +437,7 @@ def plot_4configs_comparison(
     x = np.arange(len(property_names))
     bar_width = 0.8 / max(num_configs, 1)
 
-    colors = ["#4A90E2", "#50E3C2", "#F5A623", "#E94E77", "#9013FE", "#7ED321", "#B8E986", "#417505"]
+    colors = ["#4A90E2", "#9013FE", "#50E3C2", "#F5A623", "#E94E77", "#7ED321", "#B8E986", "#417505"]
 
     for idx, label in enumerate(config_labels):
         r_vals = [dict(metrics_data["R"][name]).get(label, 0.0) for name in property_names]
@@ -446,37 +447,39 @@ def plot_4configs_comparison(
         bars1 = ax_r.bar(x + offset, r_vals, bar_width, label=label, color=c, alpha=0.85, edgecolor="black", linewidth=0.8)
         bars2 = ax_nrmse.bar(x + offset, nrmse_vals, bar_width, label=label, color=c, alpha=0.85, edgecolor="black", linewidth=0.8)
         for b in bars1:
-            ax_r.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.01, f"{b.get_height():.2f}", ha="center", va="bottom", fontsize=8, rotation=90)
+            ax_r.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.01, f"{b.get_height():.2f}", ha="center", va="bottom", fontsize=7.5, rotation=90)
         for b in bars2:
-            ax_nrmse.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.5, f"{b.get_height():.1f}%", ha="center", va="bottom", fontsize=8, rotation=90)
+            ax_nrmse.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.5, f"{b.get_height():.1f}%", ha="center", va="bottom", fontsize=7.5, rotation=90)
 
     ax_r.set_xticks(x)
     ax_r.set_xticklabels([f"Output: {p}" for p in property_names], fontsize=11, fontweight="bold")
     ax_r.set_ylabel("Parity Correlation (R)", fontsize=11, fontweight="bold")
     ax_r.set_title("Parity Correlation (R) Across Input Configurations", fontsize=12, fontweight="bold")
-    ax_r.set_ylim(0, 1.1)
+    ax_r.set_ylim(0, 1.15)
     ax_r.grid(axis="y", linestyle="--", alpha=0.5)
-    ax_r.legend(fontsize=9, loc="lower right")
+    ax_r.legend(fontsize=8.5, loc="lower right")
 
+    max_nrmse_val = max([max(dict(metrics_data["NRMSE"][name]).values(), default=10.0) for name in property_names])
     ax_nrmse.set_xticks(x)
     ax_nrmse.set_xticklabels([f"Output: {p}" for p in property_names], fontsize=11, fontweight="bold")
     ax_nrmse.set_ylabel("Normalized RMSE (%)", fontsize=11, fontweight="bold")
     ax_nrmse.set_title("Normalized RMSE (%) Across Input Configurations", fontsize=12, fontweight="bold")
-    ax_nrmse.set_ylim(0, 14.5)
+    ax_nrmse.set_ylim(0, max(max_nrmse_val * 1.18, 15.0))
     ax_nrmse.grid(axis="y", linestyle="--", alpha=0.5)
-    ax_nrmse.legend(fontsize=9, loc="upper right")
+    ax_nrmse.legend(fontsize=8.5, loc="upper right")
 
     # Bottom annotation panel: Detail Inputs and Outputs in English
     ax_info.axis("off")
     info_text = (
         "MODEL INPUT & OUTPUT SPECIFICATIONS:\n"
         "• TARGET OUTPUTS: ΔVP (P-Wave Velocity Change, m/s), ΔSw (Water Saturation Change), Δρ (Bulk Density Change) + Uncertainty (σ)\n"
-        "• CONFIG 1 (Scalar Slices / No TS): 32 Summary Attributes (Base 8 angles + Monitor 8 angles + ΔA 8 angles + Relative ΔA/A 8 angles)\n"
-        "• CONFIG 2 (Temporal Window 1D / No TS): 36 Attributes (32 Summary + 4 Principal 1D Waveform Difference Modes across angles)\n"
-        "• CONFIG 3 (Scalar Slices / With TS): 36 Attributes (32 Summary + 4 Seismic 4D Time-Shift Maps dt)\n"
-        "• CONFIG 4 (Temporal Window 1D / With TS): 40 Attributes (32 Summary + 4 Waveform Modes + 4 Time-Shift dt)"
+        "• CONFIG 1 (Scalar Slices / No TS): 32 Summary Attributes (Base 8 + Monitor 8 + ΔA 8 + Rel ΔA/A 8 across 4 angles)\n"
+        "• CONFIG 2 (Temporal Window 1D Only / No TS): 4 Attributes (4 Principal Orthogonal 1D Waveform Difference Modes)\n"
+        "• CONFIG 3 (Scalar + Temporal 1D / No TS): 36 Attributes (32 Summary + 4 Principal 1D Waveform Difference Modes)\n"
+        "• CONFIG 4 (Scalar Slices / With TS): 36 Attributes (32 Summary + 4 Seismic 4D Time-Shift Maps dt)\n"
+        "• CONFIG 5 (Scalar + Temporal 1D / With TS): 40 Attributes (32 Summary + 4 Waveform Modes + 4 Time-Shift dt)"
     )
-    ax_info.text(0.01, 0.5, info_text, fontsize=9.5, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
+    ax_info.text(0.01, 0.5, info_text, fontsize=9.0, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
 
     if output_metrics is not None:
         _save(fig_metrics, output_metrics)

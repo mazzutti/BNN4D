@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "0. [RUN-ALL] Run All 4 Ablations + Comparison Plots (Aleatoric + Epistemic)",
+      "name": "0. [RUN-ALL] Run All 5 Ablations + Comparison Plots (Aleatoric + Epistemic)",
       "type": "debugpy",
       "request": "launch",
       "module": "bnn4d.cli",

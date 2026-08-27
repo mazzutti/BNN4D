@@ -47,28 +47,20 @@ The 4 ablation configurations evaluate the incremental impact of scalar amplitud
 | **Config 3: Scalar Slices / With TS** | **36** | 32 Summary Amplitudes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9862** / **2.30%** | **0.9432** / **5.39%** | **0.9456** / **5.07%** | **0.9583** | **4.25%** |
 | **Config 4: Temporal Window 1D / With TS** | **40** | 32 Summary Amplitudes + 4 Waveform Difference Modes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9715** / **3.24%** | **0.9406** / **5.46%** | **0.9420** / **5.22%** | **0.9514** | **4.64%** |
 
-### 3.1 Input Feature Specifications
+### 3.1 Input Feature Specifications & 5-Scenario Matrix
 
-#### A. Scalar Slices Models (`*_scalar_*` files)
-For every surface trace coordinate `(x, y)`, the vertical reservoir interval is vertically integrated into scalar summary amplitudes across the 4 angle stacks (10°, 20°, 30°, 40°):
-1. **Baseline Summary Amplitudes (2013, 8 channels):**
-   * **4 × SNA (Sum of Negative Amplitudes):** `A_13(10°)`, `A_13(20°)`, `A_13(30°)`, `A_13(40°)`
-   * **4 × RMS Amplitudes:** `RMS_13(10°)`, `RMS_13(20°)`, `RMS_13(30°)`, `RMS_13(40°)`
-2. **Monitor Summary Amplitudes (2024, 8 channels):**
-   * **4 × SNA:** `A_24(10°)`, `A_24(20°)`, `A_24(30°)`, `A_24(40°)`
-   * **4 × RMS Amplitudes:** `RMS_24(10°)`, `RMS_24(20°)`, `RMS_24(30°)`, `RMS_24(40°)`
-3. **Explicit 4D Differential Amplitudes (`ΔA = A_2024 - A_2013`, 8 channels):**
-   * 4 × `ΔSNA` and 4 × `ΔRMS` across 10°, 20°, 30°, 40°
-4. **Normalized Relative 4D Differential Amplitudes (`ΔA / (|A_base| + 1e-4)`, 8 channels):**
-   * 4 × Rel `ΔSNA` and 4 × Rel `ΔRMS` across 10°, 20°, 30°, 40°
-5. **Seismic 4D Time-Shift Maps (Config 3 `*_scalar_with_ts_*`, +4 channels):**
-   * `τ_strain = ln(Vp_2024 / Vp_2013)` (integrated 4D traveltime delay)
-   * `Δdt / dt = (Vp_2024 - Vp_2013) / Vp_2024`
+The benchmark evaluates **5 distinct seismic representation configurations** across all 5 folds:
 
-#### B. 1D Temporal Window Models (`*_temporal_*` files)
-* Includes all **32 Summary Amplitude Features** above.
-* Appends **4 Principal Orthogonal 1D Waveform Modes** extracted via Singular Value Decomposition (SVD/PCA) on the multi-sample depth waveform difference `ΔW(t, θ)` centered at the reservoir midpoint.
-* When Time-Shift is active (Config 4 `*_temporal_with_ts_*`), appends the **4 Time-Shift (dt)** channels (Total = 40 features).
+1. **Config 1 (`exp1_scalar_no_ts`, 32 features): Scalar Slices / No TS**
+   * Vertically integrated Summary Amplitudes (Base 8 + Monitor 8 + ΔA 8 + Rel ΔA/A 8 across 10°, 20°, 30°, 40°).
+2. **Config 2 (`exp2_temporal_only_no_ts`, 4 features): Temporal Window 1D Only / No TS**
+   * Top 4 Principal Orthogonal 1D Waveform Difference Modes (`ΔW(t, θ)`) extracted via SVD across multi-offset trace snippets centered at the reservoir midpoint.
+3. **Config 3 (`exp3_scalar_temporal_no_ts`, 36 features): Scalar + Temporal 1D / No TS**
+   * Combined 32 Summary Amplitudes + 4 Principal 1D Waveform Modes.
+4. **Config 4 (`exp4_scalar_with_ts`, 36 features): Scalar Slices / With TS**
+   * 32 Summary Amplitudes + 4 Seismic 4D Time-Shift Maps (`τ_strain`, `Δdt/dt`).
+5. **Config 5 (`exp5_scalar_temporal_with_ts`, 40 features): Scalar + Temporal 1D / With TS**
+   * 32 Summary Amplitudes + 4 Principal 1D Waveform Modes + 4 Seismic 4D Time-Shift Maps.
 
 ---
 
@@ -77,58 +69,68 @@ For every surface trace coordinate `(x, y)`, the vertical reservoir interval is 
 ---
 
 ### 4.1 Epistemic BNN Model Results (`EpistemicBNN` / Res-BNN)
-> **Model Formulation:** Fully Variational Bayesian Neural Network with Gaussian weight distributions `w ~ Normal(μ_w, σ_w²)`. Epistemic uncertainty `σ_epistemic` is evaluated through `S = 50...200` Monte Carlo variational forward passes on the 37,935 blind field traces.
+> **Model Formulation:** Fully Variational Bayesian Neural Network with Gaussian weight distributions `w ~ Normal(μ_w, σ_w²)`. Epistemic uncertainty `σ_epistemic` is evaluated through `S = 100` Monte Carlo variational forward passes on the 37,935 blind field traces.
 
-#### A. Parity Correlation (R) & Normalized RMSE Metrics Across Configurations
-![Epistemic Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_epistemic.png)
+#### 5-Fold Cross-Validation Benchmark Summary:
+| Configuration | Features | $R_{\Delta V_P}$ | NRMSE $\Delta V_P$ | $R_{\Delta S_w}$ | NRMSE $\Delta S_w$ | $R_{\Delta \rho}$ | NRMSE $\Delta \rho$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1. Scalar Slices / No TS** | 32 | $0.7839$ | $8.82\%$ | $0.7741$ | $10.88\%$ | $0.7708$ | $10.33\%$ |
+| **2. Temporal 1D Only / No TS** | 4 | $0.0124$ | $14.94\%$ | $0.0316$ | $17.36\%$ | $0.0011$ | $17.00\%$ |
+| **3. Scalar + Temporal 1D / No TS** | 36 | $0.7411$ | $9.31\%$ | $0.7459$ | $10.91\%$ | $0.7418$ | $10.59\%$ |
+| **4. Scalar Slices / With TS** | 36 | **0.9862** | **2.28%** | **0.9429** | **5.36%** | **0.9442** | **5.11%** |
+| **5. Scalar + Temporal 1D / With TS** | 40 | **0.9715** | **3.24%** | **0.9406** | **5.46%** | **0.9420** | **5.22%** |
 
-#### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
-Spatial comparison for ΔVP (top row), ΔSw (middle row), and Δρ (bottom row):
-![Epistemic All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_epistemic_all_properties.png)
+#### A. Parity Correlation (R) & Normalized RMSE Metrics Across 5 Configurations
+![Epistemic Metrics Comparison](artifacts/ablation_study/comparison_5configs_metrics_epistemic.png)
 
-#### C. Water Saturation Change (ΔSw) & Epistemic Uncertainty (σ_epistemic)
-![Epistemic Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dsw.png)
+#### B. Water Saturation Change (ΔSw) & Epistemic Uncertainty (σ_epistemic)
+![Epistemic Water Saturation Maps](artifacts/ablation_study/comparison_5configs_maps_epistemic_dsw.png)
 
-#### D. Compressional Velocity Change (ΔVP) & Epistemic Uncertainty (σ_epistemic)
-![Epistemic Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_dvp.png)
+#### C. Compressional Velocity Change (ΔVP) & Epistemic Uncertainty (σ_epistemic)
+![Epistemic Velocity Maps](artifacts/ablation_study/comparison_5configs_maps_epistemic_dvp.png)
 
-#### E. Bulk Density Change (Δρ) & Epistemic Uncertainty (σ_epistemic)
-![Epistemic Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
+#### D. Bulk Density Change (Δρ) & Epistemic Uncertainty (σ_epistemic)
+![Epistemic Density Maps](artifacts/ablation_study/comparison_5configs_maps_epistemic_drho.png)
 
-#### F. Inversion Decoupling & EAGE Benchmark Validation (Config 3: Scalar Slices / With TS)
+#### E. Inversion Decoupling & EAGE Benchmark Validation (Config 4: Scalar Slices / With TS)
 Cross-property inversion parity, saturation front tracking, and velocity change recovery:
-![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_eage_comparison.png)
+![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_eage_comparison.png)
 
-#### G. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Config 3: Epistemic)
+#### F. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Config 4: Epistemic)
 Parity regression scatter plots and residual histograms for all 37,935 blind validation traces:
-![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_diagnostics.png)
+![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_diagnostics.png)
 
-#### H. Spatial Absolute Error Maps Across the Reservoir (Config 3: Epistemic)
-![Epistemic Error Maps](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_error_maps.png)
+#### G. Spatial Absolute Error Maps Across the Reservoir (Config 4: Epistemic)
+![Epistemic Error Maps](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_error_maps.png)
 
-#### I. 5-Fold Training & Validation Loss History (Config 3: Epistemic)
-![Epistemic Training History](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_training_history.png)
+#### H. 5-Fold Training & Validation Loss History (Config 4: Epistemic)
+![Epistemic Training History](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_training_history.png)
 
 ---
 
 ### 4.2 Aleatoric Model Results (`AleatoricAutoencoder` with Heteroscedastic Noise Head)
 > **Model Formulation:** Deterministic feedforward network with dual output heads predicting `(μ(x), log(σ²(x)))`. Aleatoric uncertainty `σ_aleatoric` directly models heteroscedastic observation noise and seismic attribute noise.
 
-#### A. Parity Correlation (R) & Normalized RMSE Metrics Across Configurations
-![Aleatoric Metrics Comparison](artifacts/ablation_study/comparison_4configs_metrics_aleatoric.png)
+#### 5-Fold Cross-Validation Benchmark Summary:
+| Configuration | Features | $R_{\Delta V_P}$ | NRMSE $\Delta V_P$ | $R_{\Delta S_w}$ | NRMSE $\Delta S_w$ | $R_{\Delta \rho}$ | NRMSE $\Delta \rho$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1. Scalar Slices / No TS** | 32 | $0.7686$ | $9.21\%$ | $0.7672$ | $11.02\%$ | $0.7765$ | $10.22\%$ |
+| **2. Temporal 1D Only / No TS** | 4 | $0.2383$ | $14.85\%$ | $0.2594$ | $16.92\%$ | $0.2473$ | $16.48\%$ |
+| **3. Scalar + Temporal 1D / No TS** | 36 | $0.7528$ | $9.45\%$ | $0.7510$ | $11.12\%$ | $0.7481$ | $10.65\%$ |
+| **4. Scalar Slices / With TS** | 36 | **0.9777** | **2.88%** | **0.9402** | **5.55%** | **0.9404** | **5.30%** |
+| **5. Scalar + Temporal 1D / With TS** | 40 | **0.9619** | **3.75%** | **0.9288** | **6.04%** | **0.9303** | **5.70%** |
 
-#### B. Multi-Property Spatial Overview (Ground Truth vs. 4 Configurations)
-Spatial comparison for ΔVP (top row), ΔSw (middle row), and Δρ (bottom row):
-![Aleatoric All Properties Comparison](artifacts/ablation_study/comparison_4configs_maps_aleatoric_all_properties.png)
+#### A. Parity Correlation (R) & Normalized RMSE Metrics Across 5 Configurations
+![Aleatoric Metrics Comparison](artifacts/ablation_study/comparison_5configs_metrics_aleatoric.png)
 
-#### C. Water Saturation Change (ΔSw) & Aleatoric Uncertainty (σ_aleatoric)
-![Aleatoric Water Saturation Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dsw.png)
+#### B. Water Saturation Change (ΔSw) & Aleatoric Uncertainty (σ_aleatoric)
+![Aleatoric Water Saturation Maps](artifacts/ablation_study/comparison_5configs_maps_aleatoric_dsw.png)
 
-#### D. Compressional Velocity Change (ΔVP) & Aleatoric Uncertainty (σ_aleatoric)
-![Aleatoric Velocity Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_dvp.png)
+#### C. Compressional Velocity Change (ΔVP) & Aleatoric Uncertainty (σ_aleatoric)
+![Aleatoric Velocity Maps](artifacts/ablation_study/comparison_5configs_maps_aleatoric_dvp.png)
 
-#### E. Bulk Density Change (Δρ) & Aleatoric Uncertainty (σ_aleatoric)
-![Aleatoric Density Maps](artifacts/ablation_study/comparison_4configs_maps_aleatoric_drho.png)
+#### D. Bulk Density Change (Δρ) & Aleatoric Uncertainty (σ_aleatoric)
+![Aleatoric Density Maps](artifacts/ablation_study/comparison_5configs_maps_aleatoric_drho.png)
 
 ---
 
