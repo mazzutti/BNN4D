@@ -553,6 +553,10 @@ def plot_4configs_comparison(
             # Save dedicated file for this property
             prop_out_path = out_p.parent / f"{stem}_{clean_slug}{out_p.suffix}"
             _save(fig_prop, prop_out_path)
+            # If rho, also save Greek rho filename for compatibility
+            if clean_slug == "drho":
+                greek_path = out_p.parent / f"{stem}_dρ{out_p.suffix}"
+                _save(fig_prop, greek_path)
             # If this is dSw, also save to default output_maps path
             if clean_slug == "dsw" or prop_idx == 0:
                 _save(fig_prop, out_p)
