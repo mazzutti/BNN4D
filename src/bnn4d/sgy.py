@@ -70,37 +70,29 @@ def extract_unisim_dataset(
     dir_2013 = sgy_dir / "2013"
     dir_2024 = sgy_dir / "2024"
 
-    # 1. Load static Porosity and Vshale to define reservoir mask and petrophysical static maps
+    # 1. Load Porosity to define 3D and 2D reservoir mask
     porosity_path = sgy_dir / "Porosity.sgy"
     poro_cube = load_segy_cube(porosity_path, grid_shape)
     res_mask_3d = poro_cube > 0
     res_mask_2d = np.any(res_mask_3d, axis=-1)
-    pore_volume = np.sum(poro_cube, axis=-1).astype(np.float32)
-
-    vsh_path = sgy_dir / "Vshale.sgy"
-    vsh_cube = load_segy_cube(vsh_path, grid_shape) if vsh_path.exists() else None
 
     h, w = grid_shape
-    poro_map = np.zeros(grid_shape, dtype=np.float32)
-    vsh_map = np.zeros(grid_shape, dtype=np.float32)
+
+    # 2. Load 2013 and 2024 seismic angle stacks:
+    # A. Scalar summary maps (SNA + RMS: 2 * num_angles total channels)
+    # B. 1D Temporal Window (top 4 orthogonal Principal Waveform Difference Modes across angles)
+    num_angles = len(angles)
+    seismic_maps = np.zeros((2, h, w, 2 * num_angles), dtype=np.float32)
+    K = 11
+    half_k = K // 2
+    raw_delta_waveforms = np.zeros((h, w, num_angles * K), dtype=np.float32)
+
+    center_idx = np.zeros(grid_shape, dtype=int)
     for i in range(h):
         for j in range(w):
-            m = res_mask_3d[i, j]
-            if np.any(m):
-                poro_map[i, j] = np.mean(poro_cube[i, j, m])
-                if vsh_cube is not None:
-                    vsh_map[i, j] = np.mean(vsh_cube[i, j, m])
-
-    yy, xx = np.indices(grid_shape)
-    x_norm = ((xx - xx.mean()) / xx.std()).astype(np.float32)
-    y_norm = ((yy - yy.mean()) / yy.std()).astype(np.float32)
-
-    static_features = np.stack([pore_volume, poro_map, vsh_map, x_norm, y_norm], axis=-1)
-
-    # 2. Load 2013 and 2024 seismic angle stacks and compute multi-attribute maps (SNA + RMS)
-    num_angles = len(angles)
-    # 2 attributes per angle: SNA and RMS -> 2 * num_angles total channels
-    seismic_maps = np.zeros((2, h, w, 2 * num_angles), dtype=np.float32)
+            if res_mask_2d[i, j]:
+                indices = np.where(res_mask_3d[i, j])[0]
+                center_idx[i, j] = int(np.median(indices))
 
     for idx, deg in enumerate(angles):
         f2013 = dir_2013 / f"seismic2013_{deg}deg_NoiseFree.sgy"
@@ -115,6 +107,26 @@ def extract_unisim_dataset(
         # RMS
         seismic_maps[0, ..., num_angles + idx] = compute_rms(cube_13, res_mask_3d)
         seismic_maps[1, ..., num_angles + idx] = compute_rms(cube_24, res_mask_3d)
+
+        # 1D Temporal Waveform snippet around reservoir horizon
+        for i in range(h):
+            for j in range(w):
+                if res_mask_2d[i, j]:
+                    c = center_idx[i, j]
+                    start = max(0, c - half_k)
+                    end = start + K
+                    feat_start = idx * K
+                    feat_end = (idx + 1) * K
+                    raw_delta_waveforms[i, j, feat_start:feat_end] = cube_24[i, j, start:end] - cube_13[i, j, start:end]
+
+    # Decompose 1D temporal difference wavefields into top 4 orthogonal principal modes (SVD/PCA)
+    n_modes = 4
+    delta_w_flat = raw_delta_waveforms[res_mask_2d]
+    _, _, Vt = np.linalg.svd(delta_w_flat, full_matrices=False)
+    pca_proj = delta_w_flat @ Vt[:n_modes].T  # [N_active, n_modes]
+
+    temporal_window_maps = np.zeros((2, h, w, n_modes), dtype=np.float32)
+    temporal_window_maps[1, res_mask_2d] = pca_proj
 
     # 3. Load dynamic properties for baseline (2013) and monitor (2024)
     vp_13 = load_segy_cube(dir_2013 / "Pvelocity2013_NoiseFree.sgy", grid_shape)
@@ -132,8 +144,6 @@ def extract_unisim_dataset(
     targets = np.zeros((2, h, w, 3), dtype=np.float32)
 
     # 4. Compute 4D time-shift / time-strain maps: tau = ln(Vp2 / Vp1) and dt_ratio = (Vp2 - Vp1) / Vp2
-    # Vintage 0 (2013): 0
-    # Vintage 1 (2024): vertically averaged in reservoir
     time_shift_maps = np.zeros((2, h, w, 2), dtype=np.float32)
 
     for i in range(h):
@@ -155,8 +165,7 @@ def extract_unisim_dataset(
 
     data = {
         "seismic": seismic_maps,
-        "pore_volume": pore_volume,
-        "static_features": static_features,
+        "temporal_window": temporal_window_maps,
         "time_shift": time_shift_maps,
         "targets": targets,
         "mask": res_mask_2d,

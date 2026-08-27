@@ -171,7 +171,7 @@ def select_subset_traces(
 
 def build_sliding_features(
     seismic: Tensor | np.ndarray,
-    pore_volume: Tensor | np.ndarray | None = None,
+    temporal_window: Tensor | np.ndarray | None = None,
     window: int = 2,
     mask: Tensor | np.ndarray | None = None,
     include_deltas: bool = True,
@@ -182,20 +182,17 @@ def build_sliding_features(
     seismic = torch.as_tensor(seismic, dtype=torch.float32)
     if seismic.ndim != 4:
         raise ValueError("expected seismic [T,H,W,A]")
-    
-    static_flat: Tensor | None = None
-    if pore_volume is not None:
-        static = torch.as_tensor(pore_volume, dtype=torch.float32)
-        if static.ndim == 2:
-            static = static.unsqueeze(-1)
-        if static.ndim != 3:
-            raise ValueError("expected static features [H,W] or [H,W,S]")
-        if seismic.shape[1:3] != static.shape[:2]:
-            raise ValueError("spatial dimensions must agree")
-        static_flat = static.reshape(-1, static.shape[-1])
 
     if not 1 <= window <= seismic.shape[0]:
         raise ValueError("window must be between 1 and the number of vintages")
+
+    tw_tensor: Tensor | None = None
+    if temporal_window is not None:
+        tw_tensor = torch.as_tensor(temporal_window, dtype=torch.float32)
+        if tw_tensor.ndim != 4:
+            raise ValueError("expected temporal_window [T,H,W,TW_CHANNELS]")
+        if tw_tensor.shape[1:3] != seismic.shape[1:3]:
+            raise ValueError("temporal_window spatial dimensions must agree with seismic")
 
     ts_tensor: Tensor | None = None
     if time_shift is not None:
@@ -213,7 +210,7 @@ def build_sliding_features(
     mask_flat = torch.as_tensor(mask, dtype=torch.bool).reshape(-1) if mask is not None else None
     examples = []
     for end in range(window - 1, seismic.shape[0]):
-        # Dynamic window attributes
+        # Dynamic window attributes (scalar summary)
         win_seis = seismic[end - window + 1 : end + 1]  # [W, H, W, A]
         dynamic = win_seis.permute(1, 2, 0, 3).reshape(-1, window * seismic.shape[-1])
         parts = [dynamic]
@@ -225,6 +222,16 @@ def build_sliding_features(
             # Explicit normalized relative 4D differential: (monitor - baseline) / (|baseline| + 1e-4)
             rel_delta = ((win_seis[-1] - win_seis[0]) / (torch.abs(win_seis[0]) + 1e-4)).reshape(-1, seismic.shape[-1])
             parts.append(rel_delta)
+
+        # Dynamic 1D Temporal Waveform Window features (4 Principal Orthogonal Modes)
+        if tw_tensor is not None:
+            if tw_tensor.shape[0] >= window:
+                win_tw = tw_tensor[end - window + 1 : end + 1]
+                tw_flat = win_tw[-1].reshape(-1, tw_tensor.shape[-1])
+            else:
+                tw_flat = tw_tensor[0].reshape(-1, tw_tensor.shape[-1])
+            parts.append(tw_flat)
+
         if ts_tensor is not None:
             if ts_tensor.shape[0] >= window:
                 win_ts = ts_tensor[end - window + 1 : end + 1]
@@ -232,8 +239,6 @@ def build_sliding_features(
             else:
                 ts_flat = ts_tensor[0].reshape(-1, ts_tensor.shape[-1])
             parts.append(ts_flat)
-        if static_flat is not None:
-            parts.append(static_flat)
         cell_features = torch.cat(parts, dim=-1)
         if mask_flat is not None:
             cell_features = cell_features[mask_flat]
@@ -244,16 +249,16 @@ def build_sliding_features(
 class SlidingWindowDataset(Dataset[tuple[Tensor, Tensor]]):
     """Flatten temporal windows of map features into per-cell training samples.
 
-    ``seismic`` has shape [vintage, rows, cols, attribute], conventionally
-    near/mid/far/gradient. ``pore_volume`` is a static [rows, cols] map and is
-    appended once if provided. Targets have shape [vintage, rows, cols, 3]. A window ending
-    at vintage t predicts the properties at t.
+    ``seismic`` has shape [vintage, rows, cols, attribute].
+    ``temporal_window`` has shape [vintage, rows, cols, tw_channels] (optional).
+    Targets have shape [vintage, rows, cols, 3]. A window ending at vintage t
+    predicts the properties at t.
     """
 
     def __init__(
         self,
         seismic: Tensor | np.ndarray,
-        pore_volume: Tensor | np.ndarray | None = None,
+        temporal_window: Tensor | np.ndarray | None = None,
         targets: Tensor | np.ndarray | None = None,
         window: int = 2,
         mask: Tensor | np.ndarray | None = None,
@@ -283,8 +288,8 @@ class SlidingWindowDataset(Dataset[tuple[Tensor, Tensor]]):
             self.targets = torch.empty((0,), dtype=torch.float32)
         self.features = build_sliding_features(
             seismic,
-            pore_volume,
-            window,
+            temporal_window=temporal_window,
+            window=window,
             mask=mask,
             include_deltas=include_deltas,
             include_relative_deltas=include_relative_deltas,
@@ -292,7 +297,9 @@ class SlidingWindowDataset(Dataset[tuple[Tensor, Tensor]]):
         )
 
     def __len__(self) -> int:
-        return self.features.shape[0]
+        return len(self.features)
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
+        if len(self.targets) == 0:
+            return self.features[index], torch.empty((0,), dtype=torch.float32)
         return self.features[index], self.targets[index]

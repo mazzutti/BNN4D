@@ -371,7 +371,7 @@ def plot_error_maps(
 def plot_4configs_comparison(
     experiment_dirs: Mapping[str, Path | str],
     truth: np.ndarray,
-    property_names: Sequence[str] = PROPERTY_NAMES,
+    property_names: Sequence[str] = ("ΔVP", "ΔSw", "Δρ"),
     mask: np.ndarray | None = None,
     output_metrics: str | Path | None = None,
     output_maps: str | Path | None = None,
@@ -384,14 +384,14 @@ def plot_4configs_comparison(
 
     # Define input descriptions for each standard configuration
     input_specs = {
-        "1. No Static / No TS": "INPUT: 32 4D Amplitudes (Base, Mon, ΔA, ΔA/A)",
-        "2. With Static / No TS": "INPUT: 37 Features (32 Ampl + 5 Static φ, Vsh, K)",
-        "3. No Static / With TS": "INPUT: 36 Features (32 Ampl + 4 Time-Shift dt)",
-        "4. With Static / With TS": "INPUT: 41 Features (32 Ampl + 4 dt + 5 Static)",
-        "1. Sem Static / Sem TS": "INPUT: 32 4D Amplitudes (Base, Mon, ΔA, ΔA/A)",
-        "2. Com Static / Sem TS": "INPUT: 37 Features (32 Ampl + 5 Static φ, Vsh, K)",
-        "3. Sem Static / Com TS": "INPUT: 36 Features (32 Ampl + 4 Time-Shift dt)",
-        "4. Com Static / Com TS": "INPUT: 41 Features (32 Ampl + 4 dt + 5 Static)",
+        "1. Scalar Slices / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, ΔA/A across 8 angles)",
+        "2. Temporal Window 1D / No TS": "INPUT: 36 Features (32 Summary + 4 Principal 1D Waveform Modes)",
+        "3. Scalar Slices / With TS": "INPUT: 36 Features (32 Summary + 4 Time-Shift dt)",
+        "4. Temporal Window 1D / With TS": "INPUT: 40 Features (32 Summary + 4 Waveform Modes + 4 dt)",
+        "1. No Static / No TS": "INPUT: 32 Summary Features (Base, Mon, ΔA, ΔA/A across 8 angles)",
+        "2. With Static / No TS": "INPUT: 36 Features (32 Summary + 4 Principal 1D Waveform Modes)",
+        "3. No Static / With TS": "INPUT: 36 Features (32 Summary + 4 Time-Shift dt)",
+        "4. With Static / With TS": "INPUT: 40 Features (32 Summary + 4 Waveform Modes + 4 dt)",
     }
 
     for label, exp_dir in experiment_dirs.items():
@@ -462,6 +462,7 @@ def plot_4configs_comparison(
     ax_nrmse.set_xticklabels([f"Output: {p}" for p in property_names], fontsize=11, fontweight="bold")
     ax_nrmse.set_ylabel("Normalized RMSE (%)", fontsize=11, fontweight="bold")
     ax_nrmse.set_title("Normalized RMSE (%) Across Input Configurations", fontsize=12, fontweight="bold")
+    ax_nrmse.set_ylim(0, 14.5)
     ax_nrmse.grid(axis="y", linestyle="--", alpha=0.5)
     ax_nrmse.legend(fontsize=9, loc="upper right")
 
@@ -470,10 +471,10 @@ def plot_4configs_comparison(
     info_text = (
         "MODEL INPUT & OUTPUT SPECIFICATIONS:\n"
         "• TARGET OUTPUTS: ΔVP (P-Wave Velocity Change, m/s), ΔSw (Water Saturation Change), Δρ (Bulk Density Change) + Uncertainty (σ)\n"
-        "• CONFIG 1 (No Static / No TS): 32 Seismic Attributes (Base 8 angles + Monitor 8 angles + ΔA 8 angles + Relative ΔA/A 8 angles)\n"
-        "• CONFIG 2 (With Static / No TS): 37 Attributes (32 Seismic + 5 Static Maps: Porosity φ, Vshale, Permeabilities Kx, Ky, Kz)\n"
-        "• CONFIG 3 (No Static / With TS): 36 Attributes (32 Seismic + 4 Seismic 4D Time-Shift Maps dt)\n"
-        "• CONFIG 4 (With Static / With TS): 41 Attributes (32 Seismic + 4 Time-Shift dt + 5 Static Rock Property Maps)"
+        "• CONFIG 1 (Scalar Slices / No TS): 32 Summary Attributes (Base 8 angles + Monitor 8 angles + ΔA 8 angles + Relative ΔA/A 8 angles)\n"
+        "• CONFIG 2 (Temporal Window 1D / No TS): 36 Attributes (32 Summary + 4 Principal 1D Waveform Difference Modes across angles)\n"
+        "• CONFIG 3 (Scalar Slices / With TS): 36 Attributes (32 Summary + 4 Seismic 4D Time-Shift Maps dt)\n"
+        "• CONFIG 4 (Temporal Window 1D / With TS): 40 Attributes (32 Summary + 4 Waveform Modes + 4 Time-Shift dt)"
     )
     ax_info.text(0.01, 0.5, info_text, fontsize=9.5, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
 

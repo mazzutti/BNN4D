@@ -74,15 +74,15 @@ def train(args: argparse.Namespace) -> None:
     arrays = _load_npz(args.data, require_targets=True)
     mask = arrays.get("mask")
     use_time_shift = getattr(args, "use_time_shift", False)
-    use_static = getattr(args, "use_static", False)
+    temporal_window = getattr(args, "temporal_window", False)
     relative_deltas = getattr(args, "relative_deltas", True)
-    static_data = arrays.get("static_features", arrays.get("pore_volume")) if use_static else None
+    temporal_window_data = arrays.get("temporal_window") if temporal_window else None
     time_shift = arrays.get("time_shift") if use_time_shift else None
     dataset = SlidingWindowDataset(
         arrays["seismic"],
-        static_data,
-        arrays["targets"],
-        args.window,
+        temporal_window=temporal_window_data,
+        targets=arrays["targets"],
+        window=args.window,
         mask=mask,
         include_deltas=True,
         include_relative_deltas=relative_deltas,
@@ -119,20 +119,11 @@ def train(args: argparse.Namespace) -> None:
         train_indices = torch.arange(n_samples)
         val_indices = torch.empty(0, dtype=torch.long)
 
-    # Noise affects time-varying seismic attributes, never static lithology/coordinates
-    static_dim = 0
-    if static_data is not None:
-        static_dim = static_data.shape[-1] if static_data.ndim == 3 else 1
     train_features = dataset.features[train_indices].clone()
     if args.noise > 0:
-        if static_dim > 0:
-            train_features[:, :-static_dim] = add_relative_gaussian_noise(
-                train_features[:, :-static_dim], args.noise, torch.Generator().manual_seed(args.seed)
-            )
-        else:
-            train_features = add_relative_gaussian_noise(
-                train_features, args.noise, torch.Generator().manual_seed(args.seed)
-            )
+        train_features = add_relative_gaussian_noise(
+            train_features, args.noise, torch.Generator().manual_seed(args.seed)
+        )
     train_targets = dataset.targets[train_indices]
 
     # Fit scalers STRICTLY on training split (no data leakage!)
@@ -207,7 +198,7 @@ def train(args: argparse.Namespace) -> None:
         "model_config": {
             "input_dim": train_features.shape[1], "output_dim": train_targets.shape[1],
             "widths": widths, "activation": args.activation, "prior_std": args.prior_std,
-            "use_time_shift": use_time_shift, "use_static": use_static,
+            "use_time_shift": use_time_shift, "temporal_window": temporal_window,
         },
         "model_state": model.state_dict(),
         "feature_scaler": _standardizer_state(feature_scaler),
@@ -215,7 +206,7 @@ def train(args: argparse.Namespace) -> None:
         "window": args.window,
         "attribute_count": arrays["seismic"].shape[-1],
         "use_time_shift": use_time_shift,
-        "use_static": use_static,
+        "temporal_window": temporal_window,
         "property_names": prop_names,
         "train_indices": train_indices.numpy(),
         "val_indices": val_indices.numpy(),
@@ -232,15 +223,15 @@ def cross_validate(args: argparse.Namespace) -> None:
     arrays = _load_npz(args.data, require_targets=True)
     mask = arrays.get("mask")
     use_time_shift = getattr(args, "use_time_shift", False)
-    use_static = getattr(args, "use_static", False)
+    temporal_window = getattr(args, "temporal_window", False)
     relative_deltas = getattr(args, "relative_deltas", True)
-    static_data = arrays.get("static_features", arrays.get("pore_volume")) if use_static else None
+    temporal_window_data = arrays.get("temporal_window") if temporal_window else None
     time_shift = arrays.get("time_shift") if use_time_shift else None
     dataset = SlidingWindowDataset(
         arrays["seismic"],
-        static_data,
-        arrays["targets"],
-        args.window,
+        temporal_window=temporal_window_data,
+        targets=arrays["targets"],
+        window=args.window,
         mask=mask,
         include_deltas=True,
         include_relative_deltas=relative_deltas,
@@ -303,10 +294,6 @@ def cross_validate(args: argparse.Namespace) -> None:
 
     fold_histories: list[dict[str, list[float]]] = []
 
-    static_dim = 0
-    if static_data is not None:
-        static_dim = static_data.shape[-1] if static_data.ndim == 3 else 1
-
     for fold in range(n_folds):
         if train_traces is not None:
             train_idx = fixed_train_idx
@@ -319,14 +306,9 @@ def cross_validate(args: argparse.Namespace) -> None:
 
         train_feats = dataset.features[train_idx].clone()
         if args.noise > 0:
-            if static_dim > 0:
-                train_feats[:, :-static_dim] = add_relative_gaussian_noise(
-                    train_feats[:, :-static_dim], args.noise, torch.Generator().manual_seed(args.seed + fold)
-                )
-            else:
-                train_feats = add_relative_gaussian_noise(
-                    train_feats, args.noise, torch.Generator().manual_seed(args.seed + fold)
-                )
+            train_feats = add_relative_gaussian_noise(
+                train_feats, args.noise, torch.Generator().manual_seed(args.seed + fold)
+            )
         train_targs = dataset.targets[train_idx]
         val_feats = dataset.features[val_idx]
         val_targs = dataset.targets[val_idx]
@@ -494,8 +476,8 @@ def predict(args: argparse.Namespace) -> None:
     arrays = _load_npz(args.data, require_targets=False)
     seismic = arrays["seismic"]
     use_time_shift = getattr(args, "use_time_shift", False) or config.get("use_time_shift", checkpoint.get("use_time_shift", False))
-    use_static = getattr(args, "use_static", False) or config.get("use_static", checkpoint.get("use_static", False))
-    static_data = arrays.get("static_features", arrays.get("pore_volume")) if use_static else None
+    temporal_window = getattr(args, "temporal_window", False) or config.get("temporal_window", checkpoint.get("temporal_window", False))
+    temporal_window_data = arrays.get("temporal_window") if temporal_window else None
     time_shift = arrays.get("time_shift") if use_time_shift else None
     mask = arrays.get("mask")
     relative_deltas = getattr(args, "relative_deltas", True) or checkpoint.get("relative_deltas", True)
@@ -503,8 +485,8 @@ def predict(args: argparse.Namespace) -> None:
         raise ValueError("input attribute count differs from the training data")
     features = build_sliding_features(
         seismic,
-        static_data,
-        checkpoint["window"],
+        temporal_window=temporal_window_data,
+        window=checkpoint["window"],
         mask=mask,
         include_deltas=True,
         include_relative_deltas=relative_deltas,
@@ -575,13 +557,13 @@ def predict(args: argparse.Namespace) -> None:
 def make_demo_data(args: argparse.Namespace) -> None:
     _seed_everything(args.seed)
     seismic = np.random.randn(args.vintages, args.rows, args.cols, 4).astype(np.float32)
-    pore_volume = np.random.uniform(0.1, 0.35, size=(args.rows, args.cols)).astype(np.float32)
+    temporal_window = np.random.randn(args.vintages, args.rows, args.cols, 12).astype(np.float32)
     targets = np.zeros((args.vintages, args.rows, args.cols, 3), dtype=np.float32)
-    targets[..., 0] = 0.5 * seismic[..., 0] - 0.3 * seismic[..., 1] + 0.1 * pore_volume
+    targets[..., 0] = 0.5 * seismic[..., 0] - 0.3 * seismic[..., 1]
     targets[..., 1] = 0.2 * seismic[..., 1] + 0.4 * seismic[..., 3]
     targets[..., 2] = -0.25 * seismic[..., 0] + 0.2 * seismic[..., 2]
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(args.output, seismic=seismic, pore_volume=pore_volume, targets=targets)
+    np.savez_compressed(args.output, seismic=seismic, temporal_window=temporal_window, targets=targets)
     print(f"demo_data={args.output} seismic={seismic.shape} targets={targets.shape}")
 
 
@@ -670,7 +652,7 @@ def _parser() -> argparse.ArgumentParser:
     fit.add_argument("--train-traces", type=int, default=None, help="number of traces/wells to train on (e.g. 15). Default: None (use all)")
     fit.add_argument("--trace-selection", choices=("unisim_wells", "spatial_optimal", "random"), default="unisim_wells", help="trace selection method (default: unisim_wells)")
     fit.add_argument("--use-time-shift", action="store_true", default=False, help="include 4D time-shift in features (default: False)")
-    fit.add_argument("--use-static", action="store_true", default=False, help="include static petrophysical/spatial features (default: False)")
+    fit.add_argument("--temporal-window", action="store_true", default=False, help="include 1D temporal waveform window features (default: False)")
     fit.add_argument("--noise", type=float, default=0.17, help="relative noise fraction (paper optimum: 0.17)")
     fit.add_argument("--epochs", type=int, default=400)
     fit.add_argument("--batch-size", type=int, default=256)
@@ -696,7 +678,7 @@ def _parser() -> argparse.ArgumentParser:
     cv_p.add_argument("--trace-selection", choices=("unisim_wells", "spatial_optimal", "random"), default="unisim_wells", help="trace selection method (default: unisim_wells)")
     cv_p.add_argument("--window", type=int, default=2)
     cv_p.add_argument("--use-time-shift", action="store_true", default=False, help="include 4D time-shift in features (default: False)")
-    cv_p.add_argument("--use-static", action="store_true", default=False, help="include static petrophysical/spatial features (default: False)")
+    cv_p.add_argument("--temporal-window", action="store_true", default=False, help="include 1D temporal waveform window features (default: False)")
     cv_p.add_argument("--noise", type=float, default=0.0)
     cv_p.add_argument("--epochs", type=int, default=200)
     cv_p.add_argument("--patience", type=int, default=10)
@@ -716,7 +698,7 @@ def _parser() -> argparse.ArgumentParser:
     infer.add_argument("--checkpoint", required=True, type=Path)
     infer.add_argument("--output", required=True, type=Path)
     infer.add_argument("--use-time-shift", action="store_true", default=False, help="force include 4D time-shift in features")
-    infer.add_argument("--use-static", action="store_true", default=False, help="force include static petrophysical/spatial features")
+    infer.add_argument("--temporal-window", action="store_true", default=False, help="force include 1D temporal waveform window features")
     infer.add_argument("--samples", type=int, default=500, help="epistemic Monte Carlo passes")
     infer.add_argument("--batch-size", type=int, default=4096)
     infer.add_argument("--device", default="auto")
@@ -769,10 +751,10 @@ def run_all_ablations(args: argparse.Namespace) -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     scenarios = [
-        ("exp1_no_static_no_ts", "1. No Static / No TS", False, False),
-        ("exp2_with_static_no_ts", "2. With Static / No TS", True, False),
-        ("exp3_no_static_with_ts", "3. No Static / With TS", False, True),
-        ("exp4_with_static_with_ts", "4. With Static / With TS", True, True),
+        ("exp1_scalar_no_ts", "1. Scalar Slices / No TS", False, False),
+        ("exp2_temporal_no_ts", "2. Temporal Window 1D / No TS", True, False),
+        ("exp3_scalar_with_ts", "3. Scalar Slices / With TS", False, True),
+        ("exp4_temporal_with_ts", "4. Temporal Window 1D / With TS", True, True),
     ]
 
     for model_type in models_to_run:
@@ -781,7 +763,7 @@ def run_all_ablations(args: argparse.Namespace) -> None:
         print(f"=======================================================\n")
 
         exp_mapping: dict[str, Path] = {}
-        for folder_prefix, label, use_static, use_time_shift in scenarios:
+        for folder_prefix, label, temporal_window, use_time_shift in scenarios:
             exp_out = args.output_dir / f"{folder_prefix}_{model_type}"
             exp_mapping[label] = exp_out
 
@@ -796,7 +778,7 @@ def run_all_ablations(args: argparse.Namespace) -> None:
                 model=model_type,
                 train_traces=args.train_traces,
                 trace_selection=args.trace_selection,
-                use_static=use_static,
+                temporal_window=temporal_window,
                 use_time_shift=use_time_shift,
                 relative_deltas=True,
                 activation=args.activation,

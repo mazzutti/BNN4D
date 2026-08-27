@@ -65,20 +65,20 @@ class ModelTests(unittest.TestCase):
 class DataTests(unittest.TestCase):
     def test_sliding_window_layout(self):
         seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
-        pore_volume = torch.ones(2, 3)
+        temporal_window = torch.ones(4, 2, 3, 4)
         targets = torch.zeros(4, 2, 3, 3)
-        data = SlidingWindowDataset(seismic, pore_volume, targets, window=2)
+        data = SlidingWindowDataset(seismic, temporal_window, targets, window=2)
         self.assertEqual(len(data), 3 * 2 * 3)
-        self.assertEqual(data.features.shape[1], 2 * 4 + 4 + 1)  # 2*channels + delta + pore_volume
+        self.assertEqual(data.features.shape[1], 2 * 4 + 4 + 4)
 
     def test_sliding_window_with_time_shift_and_rel_deltas(self):
         seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
-        pore_volume = torch.ones(2, 3)
+        temporal_window = torch.ones(4, 2, 3, 4)
         time_shift = torch.ones(4, 2, 3, 2)
         targets = torch.zeros(4, 2, 3, 3)
         data = SlidingWindowDataset(
             seismic,
-            pore_volume,
+            temporal_window,
             targets,
             window=2,
             include_deltas=True,
@@ -86,8 +86,7 @@ class DataTests(unittest.TestCase):
             time_shift=time_shift,
         )
         self.assertEqual(len(data), 3 * 2 * 3)
-        # 2*4 (seismic) + 4 (delta) + 4 (rel_delta) + 2*2 (time_shift) + 1 (pore_vol) = 21
-        self.assertEqual(data.features.shape[1], 8 + 4 + 4 + 4 + 1)
+        self.assertEqual(data.features.shape[1], 8 + 4 + 4 + 4 + 4)
 
     def test_trace_selection_strategies(self):
         from bnn4d.data import select_subset_traces

@@ -38,14 +38,14 @@ Deep feedforward architecture with dual output heads predicting mean `μ(x)` and
 
 ## 3. 4-Scenario Ablation Study: Quantitative Results
 
-The 4 ablation configurations evaluate the incremental impact of pure 4D amplitudes, static geology maps, and 4D seismic time-shifts:
+The 4 ablation configurations evaluate the incremental impact of scalar amplitude summaries, 1D temporal waveform difference modes, and 4D seismic time-shifts:
 
 | Ablation Scenario | Features | Input Features Breakdown | ΔVP (R / NRMSE) | ΔSw (R / NRMSE) | Δρ (R / NRMSE) | Mean R | Mean NRMSE |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Config 1: No Static / No TS** | **32** | 16 Multi-Angle Amplitudes (Base, Mon 8 angles) + 8 Deltas ΔA + 8 Rel. Deltas ΔA/\|A\| | 0.7517 / 9.19% | 0.7382 / 11.02% | 0.7540 / 10.36% | **0.7480** | **10.19%** |
-| **Config 2: With Static / No TS** | **37** | 32 4D Amplitudes + 5 Static Geology Maps (Porosity φ, Vshale, Permeabilities Kx, Ky, Kz) | 0.7699 / 8.87% | 0.7540 / 10.69% | 0.7790 / 9.97% | **0.7676** | **9.84%** |
-| **Config 3: No Static / With TS** | **36** | 32 4D Amplitudes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9832** / **2.53%** | **0.9450** / **5.31%** | **0.9464** / **5.05%** | **0.9582** | **4.30%** |
-| **Config 4: With Static / With TS** | **41** | 32 4D Amplitudes + 4 Time-Shift (dt) + 5 Static Geology Maps | **0.9697** / **3.34%** | **0.9416** / **5.37%** | **0.9538** / **4.66%** | **0.9550** | **4.46%** |
+| **Config 1: Scalar Slices / No TS** | **32** | 16 Multi-Angle Summary Amplitudes (Base, Mon 8 angles) + 8 Deltas ΔA + 8 Rel. Deltas ΔA/\|A\| | 0.7839 / 8.82% | 0.7741 / 10.88% | 0.7708 / 10.33% | **0.7763** | **10.01%** |
+| **Config 2: Temporal Window 1D / No TS** | **36** | 32 Summary Amplitudes + 4 Principal Orthogonal 1D Waveform Difference Modes across angles | 0.7411 / 9.31% | 0.7459 / 10.91% | 0.7418 / 10.59% | **0.7429** | **10.27%** |
+| **Config 3: Scalar Slices / With TS** | **36** | 32 Summary Amplitudes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9862** / **2.30%** | **0.9432** / **5.39%** | **0.9456** / **5.07%** | **0.9583** | **4.25%** |
+| **Config 4: Temporal Window 1D / With TS** | **40** | 32 Summary Amplitudes + 4 Waveform Difference Modes + 4 Seismic 4D Time-Shift Maps (dt) | **0.9715** / **3.24%** | **0.9406** / **5.46%** | **0.9420** / **5.22%** | **0.9514** | **4.64%** |
 
 ---
 
@@ -72,19 +72,19 @@ Spatial comparison for ΔVP (top row), ΔSw (middle row), and Δρ (bottom row):
 #### E. Bulk Density Change (Δρ) & Epistemic Uncertainty (σ_epistemic)
 ![Epistemic Density Maps](artifacts/ablation_study/comparison_4configs_maps_epistemic_drho.png)
 
-#### F. Inversion Decoupling & EAGE Benchmark Validation (Config 3: No Static / With TS)
+#### F. Inversion Decoupling & EAGE Benchmark Validation (Config 3: Scalar Slices / With TS)
 Cross-property inversion parity, saturation front tracking, and velocity change recovery:
-![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_eage_comparison.png)
+![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_eage_comparison.png)
 
 #### G. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Config 3: Epistemic)
 Parity regression scatter plots and residual histograms for all 37,935 blind validation traces:
-![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_diagnostics.png)
+![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_diagnostics.png)
 
 #### H. Spatial Absolute Error Maps Across the Reservoir (Config 3: Epistemic)
-![Epistemic Error Maps](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_error_maps.png)
+![Epistemic Error Maps](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_error_maps.png)
 
 #### I. 5-Fold Training & Validation Loss History (Config 3: Epistemic)
-![Epistemic Training History](artifacts/ablation_study/exp3_no_static_with_ts_epistemic/oof_training_history.png)
+![Epistemic Training History](artifacts/ablation_study/exp3_scalar_with_ts_epistemic/oof_training_history.png)
 
 ---
 
@@ -117,12 +117,12 @@ Comparison of the 26 canonical UNISIM-I real well training positions against spa
 
 ## 5. Geophysical Interpretation of Results
 
-1. **Why Pure Amplitudes (Configs 1 & 2) Plateau at R ≈ 0.75 - 0.78:**
-   * In multi-angle seismic amplitudes, water saturation increase (ΔSw > 0) causes an acoustic impedance hardening, while pore pressure increase (ΔP > 0) causes acoustic softening.
+1. **Why Pure Amplitudes (Configs 1 & 2) Plateau at R ≈ 0.74 - 0.78:**
+   * In multi-angle seismic amplitudes, water saturation increase (ΔSw > 0) causes acoustic impedance hardening, while pore pressure increase (ΔP > 0) causes acoustic softening.
    * Without traveltime information, amplitude-only inversion encounters cross-talk between pressure and saturation.
 2. **Why 4D Time-Shift (dt) Propels Performance to R > 0.98:**
    * 4D traveltime shifts (dt) directly integrate reservoir velocity changes and dilational strain throughout the overburden and reservoir layer.
-   * This decoupled kinematic signature enables the Res-BNN to map ΔVP with **2.53% NRMSE** and ΔSw, Δρ with **< 5.3% NRMSE**.
+   * This decoupled kinematic signature enables the Res-BNN to map ΔVP with **2.30% NRMSE** and ΔSw, Δρ with **< 5.4% NRMSE**.
 3. **Role of Predictive Uncertainty (σ):**
    * **Epistemic Uncertainty (σ_epistemic):** High in inter-well regions farthest from the 26 calibration wells, highlighting uncalibrated compartments.
    * **Aleatoric Uncertainty (σ_aleatoric):** Highlights structural discontinuities, fault scarps, and low signal-to-noise seismic zones.
@@ -136,14 +136,14 @@ The [`.vscode/launch.json`](.vscode/launch.json) file includes preconfigured tas
 * **`0. [RUN-ALL] Run All 4 Ablations + Comparison Plots (Aleatoric + Epistemic)`**
 * **`0. [RUN-ALL] Run All 4 Ablations (Epistemic Only)`**
 * **`0. [RUN-ALL] Run All 4 Ablations (Aleatoric Only)`**
-* `1. [EXP-1] 5-Fold CV: No Static / No TS (Aleatoric)`
-* `2. [EXP-1] 5-Fold CV: No Static / No TS (Epistemic)`
-* `3. [EXP-2] 5-Fold CV: With Static / No TS (Aleatoric)`
-* `4. [EXP-2] 5-Fold CV: With Static / No TS (Epistemic)`
-* `5. [EXP-3] 5-Fold CV: No Static / With TS (Aleatoric)`
-* `6. [EXP-3] 5-Fold CV: No Static / With TS (Epistemic)`
-* `7. [EXP-4] 5-Fold CV: With Static / With TS (Aleatoric)`
-* `8. [EXP-4] 5-Fold CV: With Static / With TS (Epistemic)`
+* `1. [EXP-1] 5-Fold CV: Scalar Slices / No TS (Aleatoric)`
+* `2. [EXP-1] 5-Fold CV: Scalar Slices / No TS (Epistemic)`
+* `3. [EXP-2] 5-Fold CV: Temporal Window 1D / No TS (Aleatoric)`
+* `4. [EXP-2] 5-Fold CV: Temporal Window 1D / No TS (Epistemic)`
+* `5. [EXP-3] 5-Fold CV: Scalar Slices / With TS (Aleatoric)`
+* `6. [EXP-3] 5-Fold CV: Scalar Slices / With TS (Epistemic)`
+* `7. [EXP-4] 5-Fold CV: Temporal Window 1D / With TS (Aleatoric)`
+* `8. [EXP-4] 5-Fold CV: Temporal Window 1D / With TS (Epistemic)`
 * `9. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Aleatoric)`
 * `10. [PLOT-COMPARE] Generate 4-Scenario Comparative Plots (Epistemic)`
 
@@ -180,10 +180,10 @@ uv run python -m bnn4d.cli cv \
 uv run python -m bnn4d.cli compare-ablations \
   --data artifacts/unisim_4d.npz \
   --experiments \
-    "1. No Static / No TS=artifacts/ablation_study/exp1_no_static_no_ts_epistemic" \
-    "2. With Static / No TS=artifacts/ablation_study/exp2_with_static_no_ts_epistemic" \
-    "3. No Static / With TS=artifacts/ablation_study/exp3_no_static_with_ts_epistemic" \
-    "4. With Static / With TS=artifacts/ablation_study/exp4_with_static_with_ts_epistemic" \
+    "1. Scalar Slices / No TS=artifacts/ablation_study/exp1_scalar_no_ts_epistemic" \
+    "2. Temporal Window 1D / No TS=artifacts/ablation_study/exp2_temporal_no_ts_epistemic" \
+    "3. Scalar Slices / With TS=artifacts/ablation_study/exp3_scalar_with_ts_epistemic" \
+    "4. Temporal Window 1D / With TS=artifacts/ablation_study/exp4_temporal_with_ts_epistemic" \
   --output-dir artifacts/ablation_study \
   --model-name epistemic
 ```
