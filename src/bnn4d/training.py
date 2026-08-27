@@ -66,39 +66,35 @@ def evaluate_aleatoric(
     loader: DataLoader,
     device: torch.device | str = "cpu",
 ) -> float:
+    """Evaluate predictive data-fit (MSE) on the validation split for calibrated early stopping and model selection."""
     model.eval()
-    total, count = 0.0, 0
+    total_mse, count = 0.0, 0
     for features, target in loader:
         features, target = features.to(device), target.to(device)
-        mean, log_variance = model(features)
-        loss = gaussian_nll(target, mean, log_variance)
-        total += loss.item() * features.shape[0]
+        mean, _ = model(features)
+        mse = torch.mean((target - mean) ** 2)
+        total_mse += mse.item() * features.shape[0]
         count += features.shape[0]
-    return total / count if count > 0 else 0.0
+    return total_mse / count if count > 0 else 0.0
 
 
 @torch.no_grad()
 def evaluate_epistemic(
     model: EpistemicBNN,
     loader: DataLoader,
-    training_size: int,
+    training_size: int = 1,
     observation_std: float = 1.0,
     device: torch.device | str = "cpu",
 ) -> float:
-    """Evaluate predictive data-fit loss on the validation split.
-
-    In Bayesian model evaluation, monitoring data likelihood on held-out samples
-    provides a reliable, calibrated signal for early stopping and model selection
-    without being skewed by asymptotic parameter complexity (KL) drift.
-    """
+    """Evaluate predictive data-fit (MSE) on the validation split for calibrated early stopping and model selection."""
     model.eval()
     model.clear_sample()
-    total_fit, count = 0.0, 0
+    total_mse, count = 0.0, 0
     for features, target in loader:
         features, target = features.to(device), target.to(device)
         prediction = model(features, sample=False)
-        _, data_fit, _ = variational_free_energy(prediction, target, model.kl_divergence(), training_size, observation_std)
-        total_fit += data_fit.item() * features.shape[0]
+        mse = torch.mean((target - prediction) ** 2)
+        total_mse += mse.item() * features.shape[0]
         count += features.shape[0]
-    return total_fit / count if count > 0 else 0.0
+    return total_mse / count if count > 0 else 0.0
 

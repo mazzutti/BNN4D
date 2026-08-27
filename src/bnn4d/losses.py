@@ -8,9 +8,17 @@ import torch
 from torch import Tensor
 
 
-def gaussian_nll(target: Tensor, mean: Tensor, log_variance: Tensor, reduction: str = "mean") -> Tensor:
-    """Heteroscedastic Gaussian NLL, Equation (2) in the paper."""
-    loss = 0.5 * (math.log(2 * math.pi) + log_variance + (target - mean).square() * torch.exp(-log_variance))
+def gaussian_nll(
+    target: Tensor,
+    mean: Tensor,
+    log_variance: Tensor,
+    reduction: str = "mean",
+    clamp_min: float = -6.0,
+    clamp_max: float = 4.0,
+) -> Tensor:
+    """Heteroscedastic Gaussian NLL, Equation (2) in the paper with numerical stability clamping."""
+    clamped_logv = torch.clamp(log_variance, min=clamp_min, max=clamp_max)
+    loss = 0.5 * (math.log(2 * math.pi) + clamped_logv + (target - mean).square() * torch.exp(-clamped_logv))
     if reduction == "mean":
         return loss.mean()
     if reduction == "sum":
