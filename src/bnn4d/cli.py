@@ -441,7 +441,15 @@ def cross_validate(args: argparse.Namespace) -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     out_file = args.output_dir / "oof_predictions.npz"
-    np.savez_compressed(out_file, mean=pred_out, uncertainty=unc_out, mask=mask, property_names=np.array(prop_names))
+    import json
+    np.savez_compressed(
+        out_file,
+        mean=pred_out,
+        uncertainty=unc_out,
+        mask=mask,
+        property_names=np.array(prop_names),
+        fold_histories=json.dumps(fold_histories),
+    )
 
     import matplotlib
     matplotlib.use("Agg")
