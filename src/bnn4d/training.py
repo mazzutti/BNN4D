@@ -18,7 +18,7 @@ def train_aleatoric_epoch(
     max_grad_norm: float = 1.0,
 ) -> float:
     model.train()
-    total, count = 0.0, 0
+    total_mse, count = 0.0, 0
     for features, target in loader:
         features, target = features.to(device), target.to(device)
         optimizer.zero_grad(set_to_none=True)
@@ -28,9 +28,10 @@ def train_aleatoric_epoch(
         if max_grad_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
         optimizer.step()
-        total += loss.item() * features.shape[0]
+        mse = torch.mean((target - mean) ** 2)
+        total_mse += mse.item() * features.shape[0]
         count += features.shape[0]
-    return total / count
+    return total_mse / count if count > 0 else 0.0
 
 
 def train_epistemic_epoch(
@@ -45,7 +46,7 @@ def train_epistemic_epoch(
 ) -> float:
     model.train()
     model.clear_sample()
-    total, count = 0.0, 0
+    total_mse, count = 0.0, 0
     for features, target in loader:
         features, target = features.to(device), target.to(device)
         optimizer.zero_grad(set_to_none=True)
@@ -55,9 +56,10 @@ def train_epistemic_epoch(
         if max_grad_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
         optimizer.step()
-        total += loss.item() * features.shape[0]
+        mse = torch.mean((target - prediction) ** 2)
+        total_mse += mse.item() * features.shape[0]
         count += features.shape[0]
-    return total / count
+    return total_mse / count if count > 0 else 0.0
 
 
 @torch.no_grad()
