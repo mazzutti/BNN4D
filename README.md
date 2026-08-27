@@ -163,18 +163,26 @@ Every network model takes a surface trace location `(x, y)` and predicts **3 phy
 #### D. Bulk Density Change (Δρ) & Epistemic Uncertainty (σ_epistemic)
 ![Epistemic Density Maps](artifacts/ablation_study/comparison_5configs_maps_epistemic_drho.png)
 
-#### E. Inversion Decoupling & EAGE Benchmark Validation (Config 4: Scalar Slices / With TS)
+#### E. Inversion Decoupling & EAGE Benchmark Validation (Champion Model: Config 4 Epistemic)
+> **Champion Model Highlight:** Config 4 (`Scalar Slices / With TS`) achieves the **#1 overall performance** across the entire 5-scenario benchmark suite, delivering a mean correlation of **$R = 0.9578$** and mean normalized error of **$\text{NRMSE} = 4.25\%$** on the 37,935 blind validation traces.
+
 Cross-property inversion parity, saturation front tracking, and velocity change recovery:
 ![Epistemic EAGE Inversion Comparison](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_eage_comparison.png)
 
-#### F. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Config 4: Epistemic)
-Parity regression scatter plots and residual histograms for all 37,935 blind validation traces:
+#### F. 5-Fold Out-of-Fold Diagnostics & Error Distributions (Champion Model: Config 4 Epistemic)
+Detailed validation diagnostics for the champion model across all 37,935 blind field traces:
+* **Top Row (Parity Regression):** Compares observed ground truth against out-of-fold BNN predictions. Demonstrates tight adherence to the ideal 1:1 red dashed line with correlation $R_{\Delta V_P} = \mathbf{0.986}$, $R_{\Delta S_w} = \mathbf{0.943}$, and $R_{\Delta \rho} = \mathbf{0.944}$.
+* **Middle Row (Standardized Residuals):** Residual histograms $(\text{observed} - \text{predicted}) / \sigma$ compared against standard normal distribution $\mathcal{N}(0, 1)$ (red curve), confirming unbiased predictions with near-zero mean.
+* **Bottom Row (Empirical Coverage Curves):** Cumulative coverage of predictive intervals against theoretical Gaussian nominal coverage, validating that epistemic uncertainty bounds correctly enclose field variations.
+
 ![Epistemic Diagnostics Scatter](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_diagnostics.png)
 
-#### G. Spatial Absolute Error Maps Across the Reservoir (Config 4: Epistemic)
+#### G. Spatial Absolute Error Maps Across the Reservoir (Champion Model: Config 4 Epistemic)
+Spatial distribution of absolute residuals $|\text{Ground Truth} - \text{Prediction}|$ for all three dynamic properties across the UNISIM field:
 ![Epistemic Error Maps](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_error_maps.png)
 
-#### H. 5-Fold Training & Validation Loss History (Config 4: Epistemic)
+#### H. 5-Fold Training & Validation Loss History (Champion Model: Config 4 Epistemic)
+Convergence history of training data-fit MSE (dashed lines) versus blind validation MSE (solid lines) across all 5 folds, plotted on a synchronized scale $[0.0, 0.6]$:
 ![Epistemic Training History](artifacts/ablation_study/exp4_scalar_with_ts_epistemic/oof_training_history.png)
 
 ---
