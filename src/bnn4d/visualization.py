@@ -544,7 +544,7 @@ def plot_4configs_comparison(
                 ax.set_xticks([])
                 ax.set_yticks([])
 
-        clean_slug = prop_name.lower().replace("δ", "d").replace("Δ", "d").replace("/", "_").replace(" ", "_")
+        clean_slug = prop_name.lower().replace("δ", "d").replace("Δ", "d").replace("ρ", "rho").replace("/", "_").replace(" ", "_")
         generated_map_figs[clean_slug] = fig_prop
 
         if output_maps is not None:
