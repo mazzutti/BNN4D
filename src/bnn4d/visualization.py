@@ -55,7 +55,7 @@ def plot_training_history(
     for name, values in series.items():
         label = "Training Loss" if name == "train_loss" else ("Validation Loss" if name == "val_loss" else name)
         style = "--" if name == "train_loss" else "-"
-        width = 1.5 if name == "train_loss" else 2.0
+        width = 1.0 if name == "train_loss" else 1.2
         ax.plot(np.arange(1, len(values) + 1), values, label=label, linestyle=style, linewidth=width)
     ax.set(xlabel="Epoch", ylabel="Loss", title="Training and Validation Loss History")
     if log_y:
@@ -82,9 +82,9 @@ def plot_cv_history(
         v_loss = hist.get("val_loss", [])
         c = colors[i % len(colors)]
         if len(t_loss) > 0:
-            ax.plot(np.arange(1, len(t_loss) + 1), t_loss, linestyle="--", color=c, alpha=0.4, label=f"Fold {i+1} Train" if n_folds <= 5 else None)
+            ax.plot(np.arange(1, len(t_loss) + 1), t_loss, linestyle="--", color=c, alpha=0.55, linewidth=1.0, label=f"Fold {i+1} Train" if n_folds <= 5 else None)
         if len(v_loss) > 0:
-            ax.plot(np.arange(1, len(v_loss) + 1), v_loss, linestyle="-", color=c, linewidth=2.0, label=f"Fold {i+1} Val" if n_folds <= 5 else None)
+            ax.plot(np.arange(1, len(v_loss) + 1), v_loss, linestyle="-", color=c, alpha=0.90, linewidth=1.2, label=f"Fold {i+1} Val" if n_folds <= 5 else None)
 
     ax.set(xlabel="Epoch", ylabel="Loss", title=f"{n_folds}-Fold Cross-Validation: Training & Validation Loss")
     if log_y:
@@ -474,12 +474,12 @@ def plot_4configs_comparison(
         "MODEL INPUT & OUTPUT SPECIFICATIONS:\n"
         "• TARGET OUTPUTS: ΔVP (P-Wave Velocity Change, m/s), ΔSw (Water Saturation Change), Δρ (Bulk Density Change) + Uncertainty (σ)\n"
         "• CONFIG 1 (Scalar Slices / No TS): 32 Summary Attributes (Base 8 + Monitor 8 + ΔA 8 + Rel ΔA/A 8 across 4 angles)\n"
-        "• CONFIG 2 (Temporal Window 1D Only / No TS): 4 Attributes (4 Principal Orthogonal 1D Waveform Difference Modes)\n"
-        "• CONFIG 3 (Scalar + Temporal 1D / No TS): 36 Attributes (32 Summary + 4 Principal 1D Waveform Difference Modes)\n"
+        "• CONFIG 2 (Temporal Window 1D Only / No TS): 64 Stratal Attributes (Base 16 + Mon 16 + Δ 16 + Rel Δ/Base 16 in Top/Base sublayers)\n"
+        "• CONFIG 3 (Scalar + Temporal 1D / No TS): 96 Attributes (32 Summary + 64 Stratal Temporal)\n"
         "• CONFIG 4 (Scalar Slices / With TS): 36 Attributes (32 Summary + 4 Seismic 4D Time-Shift Maps dt)\n"
-        "• CONFIG 5 (Scalar + Temporal 1D / With TS): 40 Attributes (32 Summary + 4 Waveform Modes + 4 Time-Shift dt)"
+        "• CONFIG 5 (Scalar + Temporal 1D / With TS): 100 Attributes (32 Summary + 64 Stratal Temporal + 4 Time-Shift dt)"
     )
-    ax_info.text(0.01, 0.5, info_text, fontsize=9.0, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
+    ax_info.text(0.01, 0.5, info_text, fontsize=8.8, va="center", ha="left", family="monospace", bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa", edgecolor="#ced4da", linewidth=1.2))
 
     if output_metrics is not None:
         _save(fig_metrics, output_metrics)

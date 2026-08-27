@@ -226,14 +226,23 @@ def build_sliding_features(
                 rel_delta = ((win_seis[-1] - win_seis[0]) / (torch.abs(win_seis[0]) + 1e-4)).reshape(-1, seismic.shape[-1])
                 parts.append(rel_delta)
 
-        # Dynamic 1D Temporal Waveform Window features (4 Principal Orthogonal Modes)
+        # Dynamic 1D Stratal Temporal Waveform features
         if tw_tensor is not None:
             if tw_tensor.shape[0] >= window:
                 win_tw = tw_tensor[end - window + 1 : end + 1]
-                tw_flat = win_tw[-1].reshape(-1, tw_tensor.shape[-1])
+                # Include base, monitor, explicit delta, and relative delta for stratal temporal window
+                tw_base = win_tw[0].reshape(-1, tw_tensor.shape[-1])
+                tw_mon = win_tw[-1].reshape(-1, tw_tensor.shape[-1])
+                parts.extend([tw_base, tw_mon])
+                if include_deltas and window >= 2:
+                    delta_tw = (win_tw[-1] - win_tw[0]).reshape(-1, tw_tensor.shape[-1])
+                    parts.append(delta_tw)
+                if include_relative_deltas and window >= 2:
+                    rel_delta_tw = ((win_tw[-1] - win_tw[0]) / (torch.abs(win_tw[0]) + 1e-4)).reshape(-1, tw_tensor.shape[-1])
+                    parts.append(rel_delta_tw)
             else:
                 tw_flat = tw_tensor[0].reshape(-1, tw_tensor.shape[-1])
-            parts.append(tw_flat)
+                parts.append(tw_flat)
 
         if ts_tensor is not None:
             if ts_tensor.shape[0] >= window:

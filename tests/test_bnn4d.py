@@ -69,7 +69,8 @@ class DataTests(unittest.TestCase):
         targets = torch.zeros(4, 2, 3, 3)
         data = SlidingWindowDataset(seismic, temporal_window, targets, window=2)
         self.assertEqual(len(data), 3 * 2 * 3)
-        self.assertEqual(data.features.shape[1], 2 * 4 + 4 + 4)
+        # Seismic (4 base + 4 mon + 4 delta) + Temporal (4 base + 4 mon + 4 delta) = 24
+        self.assertEqual(data.features.shape[1], 12 + 12)
 
     def test_sliding_window_with_time_shift_and_rel_deltas(self):
         seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
@@ -86,7 +87,8 @@ class DataTests(unittest.TestCase):
             time_shift=time_shift,
         )
         self.assertEqual(len(data), 3 * 2 * 3)
-        self.assertEqual(data.features.shape[1], 8 + 4 + 4 + 4 + 4)
+        # Seismic (16) + Temporal (16) + Time-Shift (4) = 36
+        self.assertEqual(data.features.shape[1], 16 + 16 + 4)
 
     def test_sliding_window_no_scalar(self):
         seismic = torch.arange(4 * 2 * 3 * 4).reshape(4, 2, 3, 4)
@@ -94,7 +96,8 @@ class DataTests(unittest.TestCase):
         targets = torch.zeros(4, 2, 3, 3)
         data = SlidingWindowDataset(seismic, temporal_window, targets, window=2, include_scalar=False)
         self.assertEqual(len(data), 3 * 2 * 3)
-        self.assertEqual(data.features.shape[1], 4)
+        # Temporal only: 4 base + 4 mon + 4 delta = 12
+        self.assertEqual(data.features.shape[1], 12)
 
     def test_trace_selection_strategies(self):
         from bnn4d.data import select_subset_traces
